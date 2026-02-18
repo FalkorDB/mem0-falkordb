@@ -1,8 +1,6 @@
 """Tests for the register/patch mechanism."""
 
-import importlib
 
-import pytest
 
 
 def test_register_adds_falkordb_to_factory():
