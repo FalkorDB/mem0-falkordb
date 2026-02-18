@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field, model_validator
 class FalkorDBConfig(BaseModel):
     host: str = Field("localhost", description="Host address for the FalkorDB server")
     port: int = Field(6379, description="Port for the FalkorDB server")
-    database: str = Field("mem0", description="Graph name prefix in FalkorDB")
+    database: str = Field(
+        "mem0",
+        description="Graph name prefix in FalkorDB (each user gets {database}_{user_id})",
+    )
     username: Optional[str] = Field(
         None, description="Username for FalkorDB authentication"
     )
@@ -15,13 +18,6 @@ class FalkorDBConfig(BaseModel):
     )
     base_label: Optional[bool] = Field(
         True, description="Whether to use base node label __Entity__ for all entities"
-    )
-    multi_graph: bool = Field(
-        True,
-        description="When True, each user_id gets a separate FalkorDB graph "
-        "(e.g. 'mem0_alice', 'mem0_bob'). Provides natural data isolation, "
-        "simpler queries, and easier cleanup. Set to False for single-graph "
-        "mode with user_id property filtering (Neo4j-compatible behavior).",
     )
 
     @model_validator(mode="before")

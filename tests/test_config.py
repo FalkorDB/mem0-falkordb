@@ -11,7 +11,6 @@ def test_default_config():
     assert config.username is None
     assert config.password is None
     assert config.base_label is True
-    assert config.multi_graph is True
 
 
 def test_custom_config():
@@ -34,8 +33,3 @@ def test_config_from_dict():
     config = FalkorDBConfig(**data)
     assert config.host == "10.0.0.1"
     assert config.database == "mygraph"
-
-
-def test_multi_graph_disabled():
-    config = FalkorDBConfig(multi_graph=False)
-    assert config.multi_graph is False

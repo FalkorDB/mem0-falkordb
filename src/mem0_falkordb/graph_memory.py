@@ -36,29 +36,20 @@ class _FalkorDBGraphWrapper:
     """Thin wrapper around the FalkorDB client to provide a .query() interface
     consistent with what the MemoryGraph methods expect (list-of-dict results).
 
-    Supports two modes:
-    - Single-graph: all data in one graph, filtered by user_id properties.
-    - Multi-graph: each user_id gets a separate FalkorDB graph for isolation.
+    Each user_id gets a separate FalkorDB graph for natural data isolation.
     """
 
-    def __init__(
-        self, host, port, database, username=None, password=None, multi_graph=True
-    ):
+    def __init__(self, host, port, database, username=None, password=None):
         connect_kwargs = {"host": host, "port": port}
         if username and password:
             connect_kwargs["username"] = username
             connect_kwargs["password"] = password
         self._db = FalkorDB(**connect_kwargs)
         self._database = database
-        self._multi_graph = multi_graph
         self._graph_cache = {}
-        if not multi_graph:
-            self._default_graph = self._db.select_graph(database)
 
-    def _get_graph(self, user_id=None):
+    def _get_graph(self, user_id):
         """Get the FalkorDB graph object for the given user_id."""
-        if not self._multi_graph or user_id is None:
-            return self._default_graph
         if user_id not in self._graph_cache:
             graph_name = f"{self._database}_{user_id}"
             self._graph_cache[user_id] = self._db.select_graph(graph_name)
@@ -74,9 +65,7 @@ class _FalkorDBGraphWrapper:
         return [dict(zip(header, row)) for row in result.result_set]
 
     def delete_graph(self, user_id):
-        """Delete an entire user graph (multi-graph mode only)."""
-        if not self._multi_graph:
-            return
+        """Delete an entire user graph."""
         graph_name = f"{self._database}_{user_id}"
         try:
             graph = self._db.select_graph(graph_name)
@@ -89,14 +78,12 @@ class _FalkorDBGraphWrapper:
 class MemoryGraph:
     def __init__(self, config):
         self.config = config
-        self.multi_graph = getattr(self.config.graph_store.config, "multi_graph", True)
         self.graph = _FalkorDBGraphWrapper(
             host=self.config.graph_store.config.host,
             port=self.config.graph_store.config.port,
             database=self.config.graph_store.config.database,
             username=self.config.graph_store.config.username,
             password=self.config.graph_store.config.password,
-            multi_graph=self.multi_graph,
         )
         self.embedding_model = EmbedderFactory.create(
             self.config.embedder.provider,
@@ -108,9 +95,6 @@ class MemoryGraph:
             self.config.graph_store.config, "base_label", True
         )
         self.node_label = ":`__Entity__`" if self.use_base_label else ""
-
-        if self.use_base_label and not self.multi_graph:
-            self._ensure_indexes()
 
         # Determine embedding dimension for vector index
         self._embedding_dim = None
@@ -148,10 +132,10 @@ class MemoryGraph:
     # Index management
     # ------------------------------------------------------------------
 
-    def _ensure_indexes(self, user_id=None):
+    def _ensure_indexes(self, user_id):
         """Create property indexes in FalkorDB. Silently ignores if they already exist."""
         label = "__Entity__"
-        for prop in ("user_id", "name") if not self.multi_graph else ("name",):
+        for prop in ("name",):
             try:
                 self.graph.query(
                     f"CREATE INDEX FOR (n:{label}) ON (n.{prop})",
@@ -160,10 +144,8 @@ class MemoryGraph:
             except Exception:
                 pass
 
-    def _ensure_vector_index(self, dim, user_id=None):
+    def _ensure_vector_index(self, dim, user_id):
         """Create vector index if not already created."""
-        if self._embedding_dim == dim and not self.multi_graph:
-            return
         label = "__Entity__" if self.use_base_label else "Node"
         try:
             self.graph.query(
@@ -177,27 +159,21 @@ class MemoryGraph:
         self._embedding_dim = dim
 
     def _ensure_user_graph_indexes(self, user_id):
-        """In multi-graph mode, ensure indexes exist for a user's graph."""
-        if not self.multi_graph:
-            return
+        """Ensure indexes exist for a user's graph."""
         if self.use_base_label:
             self._ensure_indexes(user_id=user_id)
 
     def _build_node_props(self, filters, include_name=False, name_param="name"):
         """Build node property filter string and params dict.
 
-        In multi-graph mode, user_id is implicit (separate graph per user),
-        so it's excluded from property filters.
+        user_id is implicit (separate graph per user), so it's excluded
+        from property filters. Only agent_id/run_id are included when present.
         """
         props = []
         params = {}
 
         if include_name:
             props.append(f"name: ${name_param}")
-
-        if not self.multi_graph:
-            props.append("user_id: $user_id")
-            params["user_id"] = filters["user_id"]
 
         if filters.get("agent_id"):
             props.append("agent_id: $agent_id")
@@ -208,9 +184,10 @@ class MemoryGraph:
 
         return ", ".join(props), params
 
-    def _user_id(self, filters):
-        """Return user_id for graph selection (multi-graph) or None (single-graph)."""
-        return filters["user_id"] if self.multi_graph else None
+    @staticmethod
+    def _user_id(filters):
+        """Return user_id for graph selection."""
+        return filters["user_id"]
 
     # ------------------------------------------------------------------
     # Public API (matches Mem0 graph store interface)
@@ -267,16 +244,12 @@ class MemoryGraph:
         """Delete all entities and relationships for the given filters."""
         uid = self._user_id(filters)
 
-        if (
-            self.multi_graph
-            and not filters.get("agent_id")
-            and not filters.get("run_id")
-        ):
+        if not filters.get("agent_id") and not filters.get("run_id"):
             # Drop the entire user graph for clean isolation
-            self.graph.delete_graph(filters["user_id"])
+            self.graph.delete_graph(uid)
             return
 
-        # Partial delete within a graph (single-graph, or agent/run scoped)
+        # Partial delete within a user's graph (agent/run scoped)
         node_props_str, params = self._build_node_props(filters)
         if node_props_str:
             cypher = f"MATCH (n {self.node_label} {{{node_props_str}}}) DETACH DELETE n"
@@ -461,8 +434,6 @@ class MemoryGraph:
 
             # Build WHERE clauses for vector search filtering
             where_clauses = ["score >= $threshold"]
-            if not self.multi_graph:
-                where_clauses.append("node.user_id = $user_id")
             if filters.get("agent_id"):
                 where_clauses.append("node.agent_id = $agent_id")
             if filters.get("run_id"):
@@ -754,8 +725,6 @@ class MemoryGraph:
         label = "__Entity__" if self.use_base_label else "Node"
 
         where_clauses = ["score >= $threshold"]
-        if not self.multi_graph:
-            where_clauses.append("node.user_id = $user_id")
         if filters.get("agent_id"):
             where_clauses.append("node.agent_id = $agent_id")
         if filters.get("run_id"):
@@ -776,8 +745,6 @@ class MemoryGraph:
             "embedding": embedding,
             "threshold": self.threshold,
         }
-        if not self.multi_graph:
-            params["user_id"] = filters["user_id"]
         if filters.get("agent_id"):
             params["agent_id"] = filters["agent_id"]
         if filters.get("run_id"):
