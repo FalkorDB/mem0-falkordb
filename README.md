@@ -1,4 +1,13 @@
+[![license](https://img.shields.io/github/license/falkordb/mem0-falkordb.svg)](https://github.com/falkordb/mem0-falkordb)
+[![Release](https://img.shields.io/github/release/falkordb/mem0-falkordb.svg)](https://github.com/falkordb/mem0-falkordb/releases/latest)
+[![PyPI version](https://badge.fury.io/py/mem0-falkordb.svg)](https://badge.fury.io/py/mem0-falkordb)
+[![Codecov](https://codecov.io/gh/falkordb/mem0-falkordb/branch/main/graph/badge.svg)](https://codecov.io/gh/falkordb/mem0-falkordb)
+[![Forum](https://img.shields.io/badge/Forum-falkordb-blue)](https://github.com/orgs/FalkorDB/discussions)
+[![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/ErBEqN9E)
+
 # mem0-falkordb
+
+[![Try Free](https://img.shields.io/badge/Try%20Free-FalkorDB%20Cloud-FF8101?labelColor=FDE900&style=for-the-badge&link=https://app.falkordb.cloud)](https://app.falkordb.cloud)
 
 FalkorDB graph store plugin for [Mem0](https://github.com/mem0ai/mem0). Adds FalkorDB as a graph memory backend **without modifying any Mem0 source code**.
 
