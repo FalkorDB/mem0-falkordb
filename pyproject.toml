@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mem0-falkordb"
+version = "0.1.0"
+description = "FalkorDB graph store plugin for Mem0"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "mem0-falkordb contributors" },
+]
+keywords = ["mem0", "falkordb", "graph", "memory", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "falkordb>=1.0.0",
+    "pydantic>=2.0.0",
+    "rank-bm25>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+    "mem0ai",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mem0_falkordb"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
