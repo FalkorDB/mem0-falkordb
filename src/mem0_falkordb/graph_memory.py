@@ -41,7 +41,9 @@ class _FalkorDBGraphWrapper:
     - Multi-graph: each user_id gets a separate FalkorDB graph for isolation.
     """
 
-    def __init__(self, host, port, database, username=None, password=None, multi_graph=True):
+    def __init__(
+        self, host, port, database, username=None, password=None, multi_graph=True
+    ):
         connect_kwargs = {"host": host, "port": port}
         if username and password:
             connect_kwargs["username"] = username
@@ -265,7 +267,11 @@ class MemoryGraph:
         """Delete all entities and relationships for the given filters."""
         uid = self._user_id(filters)
 
-        if self.multi_graph and not filters.get("agent_id") and not filters.get("run_id"):
+        if (
+            self.multi_graph
+            and not filters.get("agent_id")
+            and not filters.get("run_id")
+        ):
             # Drop the entire user graph for clean isolation
             self.graph.delete_graph(filters["user_id"])
             return
@@ -515,7 +521,9 @@ class MemoryGraph:
                            id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
                     """
 
-                out_results = self.graph.query(out_query, params=rel_params, user_id=uid)
+                out_results = self.graph.query(
+                    out_query, params=rel_params, user_id=uid
+                )
                 in_results = self.graph.query(in_query, params=rel_params, user_id=uid)
 
                 result_relations.extend(out_results)
