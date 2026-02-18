@@ -7,6 +7,5 @@ build/
 .venv/
 .pytest_cache/
 *.egg
-uv.lock
 .coverage
 coverage.xml
