@@ -17,7 +17,8 @@ pip install mem0ai
 ## Quick Start
 
 ```python
-import mem0_falkordb  # registers FalkorDB automatically
+import mem0_falkordb
+mem0_falkordb.setup()  # optional — avoids unused-import lint warnings
 
 from mem0 import Memory
 
