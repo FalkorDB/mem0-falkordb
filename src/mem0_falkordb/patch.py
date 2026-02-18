@@ -51,23 +51,23 @@ def _patch_factory():
 
 def _patch_config():
     """Patch GraphStoreConfig to accept FalkorDBConfig."""
-    from mem0.graphs.configs import (
-        GraphStoreConfig,
-        KuzuConfig,
-        MemgraphConfig,
-        Neo4jConfig,
-        NeptuneConfig,
-    )
+    from mem0.graphs.configs import GraphStoreConfig
 
     # 1. Update the Union type annotation to include FalkorDBConfig
+    original_annotation = GraphStoreConfig.model_fields["config"].annotation
     GraphStoreConfig.model_fields["config"].annotation = Union[
-        Neo4jConfig, MemgraphConfig, NeptuneConfig, KuzuConfig, FalkorDBConfig
+        original_annotation, FalkorDBConfig
     ]
 
-    # 2. Replace the field validator with one that handles 'falkordb'.
+    # 2. Capture the original validator and wrap it to handle 'falkordb'.
     #    Pydantic V2 inspects function signature: for mode='after', it expects
     #    exactly 2 positional params (value, info) or 1 (value only).
-    #    We replicate the original logic plus the falkordb case.
+    field_validators = GraphStoreConfig.__pydantic_decorators__.field_validators
+    original_func = None
+    for _dec_name, dec in field_validators.items():
+        original_func = dec.func
+        break
+
     def _patched_validate_config(v, values):
         provider = values.data.get("provider")
         if provider == "falkordb":
@@ -76,26 +76,9 @@ def _patch_config():
             if isinstance(v, dict):
                 return FalkorDBConfig(**v)
             return FalkorDBConfig(**v.model_dump())
-        elif provider == "neo4j":
-            if isinstance(v, Neo4jConfig):
-                return v
-            return Neo4jConfig(**(v if isinstance(v, dict) else v.model_dump()))
-        elif provider == "memgraph":
-            if isinstance(v, MemgraphConfig):
-                return v
-            return MemgraphConfig(**(v if isinstance(v, dict) else v.model_dump()))
-        elif provider in ("neptune", "neptunedb"):
-            if isinstance(v, NeptuneConfig):
-                return v
-            return NeptuneConfig(**(v if isinstance(v, dict) else v.model_dump()))
-        elif provider == "kuzu":
-            if isinstance(v, KuzuConfig):
-                return v
-            return KuzuConfig(**(v if isinstance(v, dict) else v.model_dump()))
-        else:
-            raise ValueError(f"Unsupported graph store provider: {provider}")
+        # Delegate all other providers to the original validator
+        return original_func(v, values)
 
-    field_validators = GraphStoreConfig.__pydantic_decorators__.field_validators
     for _dec_name, dec in field_validators.items():
         dec.func = _patched_validate_config
         break  # only one field_validator on 'config'

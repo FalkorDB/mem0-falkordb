@@ -20,10 +20,10 @@ class FalkorDBConfig(BaseModel):
         True, description="Whether to use base node label __Entity__ for all entities"
     )
 
-    @model_validator(mode="before")
-    def check_host_and_port(cls, values):
-        if isinstance(values, dict):
-            port = values.get("port")
-            if port is not None and not isinstance(port, int):
-                raise ValueError("'port' must be an integer.")
-        return values
+    @model_validator(mode="after")
+    def check_auth_pair(self):
+        if bool(self.username) != bool(self.password):
+            raise ValueError(
+                "Both 'username' and 'password' must be provided together, or neither."
+            )
+        return self

@@ -1,6 +1,7 @@
 """FalkorDB graph memory implementation for Mem0."""
 
 import logging
+from collections import OrderedDict
 
 from mem0.memory.utils import format_entities, sanitize_relationship_for_cypher
 
@@ -32,6 +33,9 @@ from mem0.utils.factory import EmbedderFactory, LlmFactory
 logger = logging.getLogger(__name__)
 
 
+_MAX_GRAPH_CACHE = 256
+
+
 class _FalkorDBGraphWrapper:
     """Thin wrapper around the FalkorDB client to provide a .query() interface
     consistent with what the MemoryGraph methods expect (list-of-dict results).
@@ -46,14 +50,19 @@ class _FalkorDBGraphWrapper:
             connect_kwargs["password"] = password
         self._db = FalkorDB(**connect_kwargs)
         self._database = database
-        self._graph_cache = {}
+        self._graph_cache = OrderedDict()
 
     def _get_graph(self, user_id):
         """Get the FalkorDB graph object for the given user_id."""
-        if user_id not in self._graph_cache:
-            graph_name = f"{self._database}_{user_id}"
-            self._graph_cache[user_id] = self._db.select_graph(graph_name)
-        return self._graph_cache[user_id]
+        if user_id in self._graph_cache:
+            self._graph_cache.move_to_end(user_id)
+            return self._graph_cache[user_id]
+        graph_name = f"{self._database}_{user_id}"
+        graph = self._db.select_graph(graph_name)
+        self._graph_cache[user_id] = graph
+        if len(self._graph_cache) > _MAX_GRAPH_CACHE:
+            self._graph_cache.popitem(last=False)
+        return graph
 
     def query(self, cypher, params=None, user_id=None):
         """Execute a Cypher query and return results as a list of dicts."""
@@ -71,8 +80,24 @@ class _FalkorDBGraphWrapper:
             graph = self._db.select_graph(graph_name)
             graph.delete()
         except Exception:
-            pass
+            logger.debug("Graph %s not found or already deleted", graph_name)
         self._graph_cache.pop(user_id, None)
+
+    def reset_all_graphs(self):
+        """Delete all graphs matching the database prefix."""
+        prefix = f"{self._database}_"
+        try:
+            all_graphs = self._db.list_graphs()
+        except Exception:
+            logger.warning("Failed to list graphs for reset")
+            return
+        for graph_name in all_graphs:
+            if graph_name.startswith(prefix):
+                try:
+                    self._db.select_graph(graph_name).delete()
+                except Exception:
+                    logger.debug("Failed to delete graph %s during reset", graph_name)
+        self._graph_cache.clear()
 
 
 class MemoryGraph:
@@ -96,8 +121,7 @@ class MemoryGraph:
         )
         self.node_label = ":`__Entity__`" if self.use_base_label else ""
 
-        # Determine embedding dimension for vector index
-        self._embedding_dim = None
+        self._indexed_user_graphs = set()
 
         # Default to openai if no specific provider is configured
         self.llm_provider = "openai"
@@ -121,7 +145,6 @@ class MemoryGraph:
         elif hasattr(self.config.llm, "config"):
             llm_config = self.config.llm.config
         self.llm = LlmFactory.create(self.llm_provider, llm_config)
-        self.user_id = None
         self.threshold = (
             self.config.graph_store.threshold
             if hasattr(self.config.graph_store, "threshold")
@@ -135,14 +158,15 @@ class MemoryGraph:
     def _ensure_indexes(self, user_id):
         """Create property indexes in FalkorDB. Silently ignores if they already exist."""
         label = "__Entity__"
-        for prop in ("name",):
-            try:
-                self.graph.query(
-                    f"CREATE INDEX FOR (n:{label}) ON (n.{prop})",
-                    user_id=user_id,
-                )
-            except Exception:
-                pass
+        try:
+            self.graph.query(
+                f"CREATE INDEX FOR (n:{label}) ON (n.name)",
+                user_id=user_id,
+            )
+        except Exception:
+            logger.debug(
+                "Index on %s.name may already exist for user %s", label, user_id
+            )
 
     def _ensure_vector_index(self, dim, user_id):
         """Create vector index if not already created."""
@@ -154,14 +178,15 @@ class MemoryGraph:
                 user_id=user_id,
             )
         except Exception:
-            # Index may already exist
-            pass
-        self._embedding_dim = dim
+            logger.debug("Vector index may already exist for user %s", user_id)
 
     def _ensure_user_graph_indexes(self, user_id):
-        """Ensure indexes exist for a user's graph."""
+        """Ensure indexes exist for a user's graph (skips if already done)."""
+        if user_id in self._indexed_user_graphs:
+            return
         if self.use_base_label:
             self._ensure_indexes(user_id=user_id)
+        self._indexed_user_graphs.add(user_id)
 
     def _build_node_props(self, filters, include_name=False, name_param="name"):
         """Build node property filter string and params dict.
@@ -247,6 +272,7 @@ class MemoryGraph:
         if not filters.get("agent_id") and not filters.get("run_id"):
             # Drop the entire user graph for clean isolation
             self.graph.delete_graph(uid)
+            self._indexed_user_graphs.discard(uid)
             return
 
         # Partial delete within a user's graph (agent/run scoped)
@@ -291,9 +317,12 @@ class MemoryGraph:
         return final_results
 
     def reset(self):
-        """Reset the graph by clearing all nodes and relationships."""
-        logger.warning("Clearing graph...")
-        return self.graph.query("MATCH (n) DETACH DELETE n")
+        """Reset all user graphs under this database prefix."""
+        logger.warning(
+            "Resetting all graphs with prefix '%s_'...", self.graph._database
+        )
+        self.graph.reset_all_graphs()
+        self._indexed_user_graphs.clear()
 
     # ------------------------------------------------------------------
     # LLM-based entity extraction (reuses Mem0's tools)
@@ -342,8 +371,8 @@ class MemoryGraph:
         if filters.get("run_id"):
             user_identity += f", run_id: {filters['run_id']}"
 
+        system_content = EXTRACT_RELATIONS_PROMPT.replace("USER_ID", user_identity)
         if self.config.graph_store.custom_prompt:
-            system_content = EXTRACT_RELATIONS_PROMPT.replace("USER_ID", user_identity)
             system_content = system_content.replace(
                 "CUSTOM_PROMPT", f"4. {self.config.graph_store.custom_prompt}"
             )
@@ -352,7 +381,6 @@ class MemoryGraph:
                 {"role": "user", "content": data},
             ]
         else:
-            system_content = EXTRACT_RELATIONS_PROMPT.replace("USER_ID", user_identity)
             messages = [
                 {"role": "system", "content": system_content},
                 {
@@ -465,32 +493,19 @@ class MemoryGraph:
                 node_id = sn["node_id"]
                 rel_params = {"node_id": node_id, **base_params}
 
-                if node_props_str:
-                    out_query = f"""
-                    MATCH (n {self.node_label})-[r]->(m {self.node_label} {{{node_props_str}}})
-                    WHERE id(n) = $node_id
-                    RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
-                           id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
-                    """
-                    in_query = f"""
-                    MATCH (n {self.node_label})<-[r]-(m {self.node_label} {{{node_props_str}}})
-                    WHERE id(n) = $node_id
-                    RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
-                           id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
-                    """
-                else:
-                    out_query = f"""
-                    MATCH (n {self.node_label})-[r]->(m {self.node_label})
-                    WHERE id(n) = $node_id
-                    RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
-                           id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
-                    """
-                    in_query = f"""
-                    MATCH (n {self.node_label})<-[r]-(m {self.node_label})
-                    WHERE id(n) = $node_id
-                    RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
-                           id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
-                    """
+                match_props = f" {{{node_props_str}}}" if node_props_str else ""
+                out_query = f"""
+                MATCH (n {self.node_label})-[r]->(m {self.node_label}{match_props})
+                WHERE id(n) = $node_id
+                RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
+                       id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
+                """
+                in_query = f"""
+                MATCH (n {self.node_label})<-[r]-(m {self.node_label}{match_props})
+                WHERE id(n) = $node_id
+                RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
+                       id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
+                """
 
                 out_results = self.graph.query(
                     out_query, params=rel_params, user_id=uid
@@ -578,12 +593,8 @@ class MemoryGraph:
             dest_embedding = self.embedding_model.embed(destination)
             self._ensure_vector_index(len(source_embedding), user_id=uid)
 
-            source_node = self._search_node_by_embedding(
-                source_embedding, filters, "source_candidate"
-            )
-            dest_node = self._search_node_by_embedding(
-                dest_embedding, filters, "destination_candidate"
-            )
+            source_node = self._search_node_by_embedding(source_embedding, filters)
+            dest_node = self._search_node_by_embedding(dest_embedding, filters)
 
             if not dest_node and source_node:
                 dest_merge_str, params = self._build_node_props(
@@ -715,7 +726,7 @@ class MemoryGraph:
     # FalkorDB-specific Cypher: node search by embedding similarity
     # ------------------------------------------------------------------
 
-    def _search_node_by_embedding(self, embedding, filters, alias="candidate"):
+    def _search_node_by_embedding(self, embedding, filters):
         """Search for a node by embedding similarity.
 
         Returns the node id (integer) if found, or None.

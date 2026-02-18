@@ -80,7 +80,7 @@ def test_delete_all(mock_falkordb, mock_config):
 
 
 def test_reset(mock_falkordb, mock_config):
-    """reset() should clear the entire graph."""
+    """reset() should delete all graphs matching the database prefix."""
     mock_db, mock_graph = mock_falkordb
 
     with (
@@ -90,14 +90,31 @@ def test_reset(mock_falkordb, mock_config):
         mock_emb.create.return_value = MagicMock()
         mock_llm.create.return_value = MagicMock()
 
+        # Set up list_graphs to return some matching and non-matching graphs
+        mock_db.return_value.list_graphs.return_value = [
+            "mem0_alice",
+            "mem0_bob",
+            "other_graph",
+        ]
+        mock_delete_graph = MagicMock()
+        mock_db.return_value.select_graph.return_value = MagicMock(
+            delete=mock_delete_graph, query=mock_graph.query
+        )
+
         from mem0_falkordb.graph_memory import MemoryGraph
 
         mg = MemoryGraph(mock_config)
         mg.reset()
 
-        # reset uses the wrapper's query which delegates to a graph
-        calls = mock_graph.query.call_args_list
-        assert any("MATCH (n) DETACH DELETE n" in str(c) for c in calls)
+        # Should have listed graphs
+        mock_db.return_value.list_graphs.assert_called_once()
+        # Should have called select_graph for the two matching graphs
+        select_calls = [
+            c
+            for c in mock_db.return_value.select_graph.call_args_list
+            if c[0][0] in ("mem0_alice", "mem0_bob")
+        ]
+        assert len(select_calls) == 2
 
 
 def test_get_all(mock_falkordb, mock_config):
@@ -128,3 +145,29 @@ def test_get_all(mock_falkordb, mock_config):
         assert results[0]["target"] == "pizza"
         # Verify it selected the user-specific graph
         mock_db.return_value.select_graph.assert_any_call("mem0_alice")
+
+
+def test_index_caching(mock_falkordb, mock_config):
+    """_ensure_user_graph_indexes should only create indexes once per user."""
+    mock_db, mock_graph = mock_falkordb
+
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
+        mock_emb.create.return_value = MagicMock()
+        mock_llm.create.return_value = MagicMock()
+
+        from mem0_falkordb.graph_memory import MemoryGraph
+
+        mg = MemoryGraph(mock_config)
+
+        # Call twice for same user
+        mg._ensure_user_graph_indexes("alice")
+        mg._ensure_user_graph_indexes("alice")
+
+        # The underlying query should only have been called once (for CREATE INDEX)
+        index_calls = [
+            c for c in mock_graph.query.call_args_list if "CREATE INDEX" in str(c)
+        ]
+        assert len(index_calls) == 1
