@@ -1,5 +1,4 @@
 [![license](https://img.shields.io/github/license/falkordb/mem0-falkordb.svg)](https://github.com/falkordb/mem0-falkordb)
-[![Release](https://img.shields.io/github/release/falkordb/mem0-falkordb.svg)](https://github.com/falkordb/mem0-falkordb/releases/latest)
 [![PyPI version](https://badge.fury.io/py/mem0-falkordb.svg)](https://badge.fury.io/py/mem0-falkordb)
 [![Codecov](https://codecov.io/gh/falkordb/mem0-falkordb/branch/main/graph/badge.svg)](https://codecov.io/gh/falkordb/mem0-falkordb)
 [![Forum](https://img.shields.io/badge/Forum-falkordb-blue)](https://github.com/orgs/FalkorDB/discussions)
