@@ -58,10 +58,36 @@ results = m.search("what does alice like?", user_id="alice")
 |-------------|--------|-------------|------------------------------------|
 | `host`      | str    | `localhost` | FalkorDB server host               |
 | `port`      | int    | `6379`      | FalkorDB server port               |
-| `database`  | str    | `mem0`      | Graph name in FalkorDB             |
+| `database`  | str    | `mem0`      | Graph name prefix in FalkorDB      |
 | `username`  | str    | `None`      | Authentication username (optional) |
 | `password`  | str    | `None`      | Authentication password (optional) |
 | `base_label`| bool   | `True`      | Use `__Entity__` base label        |
+| `multi_graph`| bool  | `True`      | Use a separate graph per user_id   |
+
+### Multi-Graph Mode (default)
+
+When `multi_graph=True`, each user gets their own isolated FalkorDB graph (e.g. `mem0_alice`, `mem0_bob`). This provides:
+
+- **Natural data isolation** — no user_id filtering needed in Cypher queries
+- **Simpler, faster queries** — no WHERE clauses on user_id
+- **Easy cleanup** — `delete_all` simply drops the user's graph
+- **Leverages FalkorDB's native multi-graph support**
+
+To disable and use a single shared graph with user_id property filtering (similar to Neo4j behavior):
+
+```python
+config = {
+    "graph_store": {
+        "provider": "falkordb",
+        "config": {
+            "host": "localhost",
+            "port": 6379,
+            "database": "mem0",
+            "multi_graph": False,
+        },
+    },
+}
+```
 
 ## Running FalkorDB
 

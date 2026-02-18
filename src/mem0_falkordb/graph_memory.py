@@ -34,34 +34,67 @@ logger = logging.getLogger(__name__)
 
 class _FalkorDBGraphWrapper:
     """Thin wrapper around the FalkorDB client to provide a .query() interface
-    consistent with what the MemoryGraph methods expect (list-of-dict results)."""
+    consistent with what the MemoryGraph methods expect (list-of-dict results).
 
-    def __init__(self, host, port, database, username=None, password=None):
+    Supports two modes:
+    - Single-graph: all data in one graph, filtered by user_id properties.
+    - Multi-graph: each user_id gets a separate FalkorDB graph for isolation.
+    """
+
+    def __init__(self, host, port, database, username=None, password=None, multi_graph=True):
         connect_kwargs = {"host": host, "port": port}
         if username and password:
             connect_kwargs["username"] = username
             connect_kwargs["password"] = password
         self._db = FalkorDB(**connect_kwargs)
-        self._graph = self._db.select_graph(database)
+        self._database = database
+        self._multi_graph = multi_graph
+        self._graph_cache = {}
+        if not multi_graph:
+            self._default_graph = self._db.select_graph(database)
 
-    def query(self, cypher, params=None):
+    def _get_graph(self, user_id=None):
+        """Get the FalkorDB graph object for the given user_id."""
+        if not self._multi_graph or user_id is None:
+            return self._default_graph
+        if user_id not in self._graph_cache:
+            graph_name = f"{self._database}_{user_id}"
+            self._graph_cache[user_id] = self._db.select_graph(graph_name)
+        return self._graph_cache[user_id]
+
+    def query(self, cypher, params=None, user_id=None):
         """Execute a Cypher query and return results as a list of dicts."""
-        result = self._graph.query(cypher, params=params)
+        graph = self._get_graph(user_id)
+        result = graph.query(cypher, params=params)
         if not result.result_set:
             return []
         header = result.header
         return [dict(zip(header, row)) for row in result.result_set]
 
+    def delete_graph(self, user_id):
+        """Delete an entire user graph (multi-graph mode only)."""
+        if not self._multi_graph:
+            return
+        graph_name = f"{self._database}_{user_id}"
+        try:
+            graph = self._db.select_graph(graph_name)
+            graph.delete()
+        except Exception:
+            pass
+        self._graph_cache.pop(user_id, None)
+
 
 class MemoryGraph:
     def __init__(self, config):
         self.config = config
+        self.multi_graph = getattr(self.config.graph_store.config, "multi_graph", True)
         self.graph = _FalkorDBGraphWrapper(
             host=self.config.graph_store.config.host,
             port=self.config.graph_store.config.port,
             database=self.config.graph_store.config.database,
             username=self.config.graph_store.config.username,
             password=self.config.graph_store.config.password,
+            multi_graph=self.multi_graph,
         )
         self.embedding_model = EmbedderFactory.create(
             self.config.embedder.provider,
@@ -74,7 +107,7 @@ class MemoryGraph:
         )
         self.node_label = ":`__Entity__`" if self.use_base_label else ""
 
-        if self.use_base_label:
+        if self.use_base_label and not self.multi_graph:
             self._ensure_indexes()
 
         # Determine embedding dimension for vector index
@@ -113,29 +146,69 @@ class MemoryGraph:
     # Index management
     # ------------------------------------------------------------------
 
-    def _ensure_indexes(self):
+    def _ensure_indexes(self, user_id=None):
         """Create property indexes in FalkorDB. Silently ignores if they already exist."""
         label = "__Entity__"
-        for prop in ("user_id", "name"):
+        for prop in ("user_id", "name") if not self.multi_graph else ("name",):
             try:
-                self.graph.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
+                self.graph.query(
+                    f"CREATE INDEX FOR (n:{label}) ON (n.{prop})",
+                    user_id=user_id,
+                )
             except Exception:
                 pass
 
-    def _ensure_vector_index(self, dim):
+    def _ensure_vector_index(self, dim, user_id=None):
         """Create vector index if not already created."""
-        if self._embedding_dim == dim:
+        if self._embedding_dim == dim and not self.multi_graph:
             return
         label = "__Entity__" if self.use_base_label else "Node"
         try:
             self.graph.query(
                 f"CREATE VECTOR INDEX FOR (n:{label}) ON (n.embedding) "
-                f"OPTIONS {{dimension: {dim}, similarityFunction: 'cosine'}}"
+                f"OPTIONS {{dimension: {dim}, similarityFunction: 'cosine'}}",
+                user_id=user_id,
             )
         except Exception:
             # Index may already exist
             pass
         self._embedding_dim = dim
+
+    def _ensure_user_graph_indexes(self, user_id):
+        """In multi-graph mode, ensure indexes exist for a user's graph."""
+        if not self.multi_graph:
+            return
+        if self.use_base_label:
+            self._ensure_indexes(user_id=user_id)
+
+    def _build_node_props(self, filters, include_name=False, name_param="name"):
+        """Build node property filter string and params dict.
+
+        In multi-graph mode, user_id is implicit (separate graph per user),
+        so it's excluded from property filters.
+        """
+        props = []
+        params = {}
+
+        if include_name:
+            props.append(f"name: ${name_param}")
+
+        if not self.multi_graph:
+            props.append("user_id: $user_id")
+            params["user_id"] = filters["user_id"]
+
+        if filters.get("agent_id"):
+            props.append("agent_id: $agent_id")
+            params["agent_id"] = filters["agent_id"]
+        if filters.get("run_id"):
+            props.append("run_id: $run_id")
+            params["run_id"] = filters["run_id"]
+
+        return ", ".join(props), params
+
+    def _user_id(self, filters):
+        """Return user_id for graph selection (multi-graph) or None (single-graph)."""
+        return filters["user_id"] if self.multi_graph else None
 
     # ------------------------------------------------------------------
     # Public API (matches Mem0 graph store interface)
@@ -143,6 +216,7 @@ class MemoryGraph:
 
     def add(self, data, filters):
         """Add data to the graph."""
+        self._ensure_user_graph_indexes(filters["user_id"])
         entity_type_map = self._retrieve_nodes_from_data(data, filters)
         to_be_added = self._establish_nodes_relations_from_data(
             data, filters, entity_type_map
@@ -189,43 +263,40 @@ class MemoryGraph:
 
     def delete_all(self, filters):
         """Delete all entities and relationships for the given filters."""
-        node_props = ["user_id: $user_id"]
-        if filters.get("agent_id"):
-            node_props.append("agent_id: $agent_id")
-        if filters.get("run_id"):
-            node_props.append("run_id: $run_id")
-        node_props_str = ", ".join(node_props)
+        uid = self._user_id(filters)
 
-        cypher = f"""
-        MATCH (n {self.node_label} {{{node_props_str}}})
-        DETACH DELETE n
-        """
-        params = {"user_id": filters["user_id"]}
-        if filters.get("agent_id"):
-            params["agent_id"] = filters["agent_id"]
-        if filters.get("run_id"):
-            params["run_id"] = filters["run_id"]
-        self.graph.query(cypher, params=params)
+        if self.multi_graph and not filters.get("agent_id") and not filters.get("run_id"):
+            # Drop the entire user graph for clean isolation
+            self.graph.delete_graph(filters["user_id"])
+            return
+
+        # Partial delete within a graph (single-graph, or agent/run scoped)
+        node_props_str, params = self._build_node_props(filters)
+        if node_props_str:
+            cypher = f"MATCH (n {self.node_label} {{{node_props_str}}}) DETACH DELETE n"
+        else:
+            cypher = f"MATCH (n {self.node_label}) DETACH DELETE n"
+        self.graph.query(cypher, params=params, user_id=uid)
 
     def get_all(self, filters, limit=100):
         """Retrieve all nodes and relationships from the graph."""
-        params = {"user_id": filters["user_id"], "limit": limit}
+        uid = self._user_id(filters)
+        node_props_str, params = self._build_node_props(filters)
+        params["limit"] = limit
 
-        node_props = ["user_id: $user_id"]
-        if filters.get("agent_id"):
-            node_props.append("agent_id: $agent_id")
-            params["agent_id"] = filters["agent_id"]
-        if filters.get("run_id"):
-            node_props.append("run_id: $run_id")
-            params["run_id"] = filters["run_id"]
-        node_props_str = ", ".join(node_props)
-
-        query = f"""
-        MATCH (n {self.node_label} {{{node_props_str}}})-[r]->(m {self.node_label} {{{node_props_str}}})
-        RETURN n.name AS source, type(r) AS relationship, m.name AS target
-        LIMIT $limit
-        """
-        results = self.graph.query(query, params=params)
+        if node_props_str:
+            query = f"""
+            MATCH (n {self.node_label} {{{node_props_str}}})-[r]->(m {self.node_label})
+            RETURN n.name AS source, type(r) AS relationship, m.name AS target
+            LIMIT $limit
+            """
+        else:
+            query = f"""
+            MATCH (n {self.node_label})-[r]->(m {self.node_label})
+            RETURN n.name AS source, type(r) AS relationship, m.name AS target
+            LIMIT $limit
+            """
+        results = self.graph.query(query, params=params, user_id=uid)
 
         final_results = []
         for result in results:
@@ -373,29 +444,30 @@ class MemoryGraph:
     def _search_graph_db(self, node_list, filters, limit=100):
         """Search similar nodes and their incoming/outgoing relations using FalkorDB vector search."""
         result_relations = []
-
-        node_props = ["user_id: $user_id"]
-        if filters.get("agent_id"):
-            node_props.append("agent_id: $agent_id")
-        if filters.get("run_id"):
-            node_props.append("run_id: $run_id")
-        node_props_str = ", ".join(node_props)
+        uid = self._user_id(filters)
+        node_props_str, base_params = self._build_node_props(filters)
 
         for node in node_list:
             n_embedding = self.embedding_model.embed(node)
-            self._ensure_vector_index(len(n_embedding))
+            self._ensure_vector_index(len(n_embedding), user_id=uid)
 
             label = "__Entity__" if self.use_base_label else "Node"
 
-            # Use FalkorDB's vector search procedure to find similar nodes
+            # Build WHERE clauses for vector search filtering
+            where_clauses = ["score >= $threshold"]
+            if not self.multi_graph:
+                where_clauses.append("node.user_id = $user_id")
+            if filters.get("agent_id"):
+                where_clauses.append("node.agent_id = $agent_id")
+            if filters.get("run_id"):
+                where_clauses.append("node.run_id = $run_id")
+            where_str = " AND ".join(where_clauses)
+
             vector_query = f"""
             CALL db.idx.vector.queryNodes('{label}', 'embedding', $limit, vecf32($n_embedding))
             YIELD node, score
             WITH node, score
-            WHERE node.user_id = $user_id
-            {"AND node.agent_id = $agent_id" if filters.get("agent_id") else ""}
-            {"AND node.run_id = $run_id" if filters.get("run_id") else ""}
-            AND score >= $threshold
+            WHERE {where_str}
             WITH node, score
             ORDER BY score DESC
             LIMIT $limit
@@ -405,42 +477,46 @@ class MemoryGraph:
             params = {
                 "n_embedding": n_embedding,
                 "threshold": self.threshold,
-                "user_id": filters["user_id"],
                 "limit": limit,
+                **base_params,
             }
-            if filters.get("agent_id"):
-                params["agent_id"] = filters["agent_id"]
-            if filters.get("run_id"):
-                params["run_id"] = filters["run_id"]
 
-            similar_nodes = self.graph.query(vector_query, params=params)
+            similar_nodes = self.graph.query(vector_query, params=params, user_id=uid)
 
             # For each similar node, fetch outgoing and incoming relationships
             for sn in similar_nodes:
                 node_id = sn["node_id"]
+                rel_params = {"node_id": node_id, **base_params}
 
-                # Outgoing relationships
-                out_query = f"""
-                MATCH (n {self.node_label})-[r]->(m {self.node_label} {{{node_props_str}}})
-                WHERE id(n) = $node_id
-                RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
-                       id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
-                """
-                out_params = {"node_id": node_id, "user_id": filters["user_id"]}
-                if filters.get("agent_id"):
-                    out_params["agent_id"] = filters["agent_id"]
-                if filters.get("run_id"):
-                    out_params["run_id"] = filters["run_id"]
-                out_results = self.graph.query(out_query, params=out_params)
+                if node_props_str:
+                    out_query = f"""
+                    MATCH (n {self.node_label})-[r]->(m {self.node_label} {{{node_props_str}}})
+                    WHERE id(n) = $node_id
+                    RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
+                           id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
+                    """
+                    in_query = f"""
+                    MATCH (n {self.node_label})<-[r]-(m {self.node_label} {{{node_props_str}}})
+                    WHERE id(n) = $node_id
+                    RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
+                           id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
+                    """
+                else:
+                    out_query = f"""
+                    MATCH (n {self.node_label})-[r]->(m {self.node_label})
+                    WHERE id(n) = $node_id
+                    RETURN n.name AS source, id(n) AS source_id, type(r) AS relationship,
+                           id(r) AS relation_id, m.name AS destination, id(m) AS destination_id
+                    """
+                    in_query = f"""
+                    MATCH (n {self.node_label})<-[r]-(m {self.node_label})
+                    WHERE id(n) = $node_id
+                    RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
+                           id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
+                    """
 
-                # Incoming relationships
-                in_query = f"""
-                MATCH (n {self.node_label})<-[r]-(m {self.node_label} {{{node_props_str}}})
-                WHERE id(n) = $node_id
-                RETURN m.name AS source, id(m) AS source_id, type(r) AS relationship,
-                       id(r) AS relation_id, n.name AS destination, id(n) AS destination_id
-                """
-                in_results = self.graph.query(in_query, params=out_params)
+                out_results = self.graph.query(out_query, params=rel_params, user_id=uid)
+                in_results = self.graph.query(in_query, params=rel_params, user_id=uid)
 
                 result_relations.extend(out_results)
                 result_relations.extend(in_results)
@@ -462,9 +538,7 @@ class MemoryGraph:
 
     def _delete_entities(self, to_be_deleted, filters):
         """Delete entities from the graph."""
-        user_id = filters["user_id"]
-        agent_id = filters.get("agent_id", None)
-        run_id = filters.get("run_id", None)
+        uid = self._user_id(filters)
         results = []
 
         for item in to_be_deleted:
@@ -472,26 +546,14 @@ class MemoryGraph:
             destination = item["destination"]
             relationship = item["relationship"]
 
-            params = {
-                "source_name": source,
-                "dest_name": destination,
-                "user_id": user_id,
-            }
-            if agent_id:
-                params["agent_id"] = agent_id
-            if run_id:
-                params["run_id"] = run_id
-
-            source_props = ["name: $source_name", "user_id: $user_id"]
-            dest_props = ["name: $dest_name", "user_id: $user_id"]
-            if agent_id:
-                source_props.append("agent_id: $agent_id")
-                dest_props.append("agent_id: $agent_id")
-            if run_id:
-                source_props.append("run_id: $run_id")
-                dest_props.append("run_id: $run_id")
-            source_props_str = ", ".join(source_props)
-            dest_props_str = ", ".join(dest_props)
+            source_props_str, params = self._build_node_props(
+                filters, include_name=True, name_param="source_name"
+            )
+            dest_props_str, _ = self._build_node_props(
+                filters, include_name=True, name_param="dest_name"
+            )
+            params["source_name"] = source
+            params["dest_name"] = destination
 
             cypher = f"""
             MATCH (n {self.node_label} {{{source_props_str}}})
@@ -503,7 +565,7 @@ class MemoryGraph:
                 m.name AS target,
                 type(r) AS relationship
             """
-            result = self.graph.query(cypher, params=params)
+            result = self.graph.query(cypher, params=params, user_id=uid)
             results.append(result)
 
         return results
@@ -514,9 +576,7 @@ class MemoryGraph:
 
     def _add_entities(self, to_be_added, filters, entity_type_map):
         """Add new entities to the graph. Merge nodes if they already exist."""
-        user_id = filters["user_id"]
-        agent_id = filters.get("agent_id", None)
-        run_id = filters.get("run_id", None)
+        uid = self._user_id(filters)
         results = []
 
         for item in to_be_added:
@@ -537,7 +597,7 @@ class MemoryGraph:
 
             source_embedding = self.embedding_model.embed(source)
             dest_embedding = self.embedding_model.embed(destination)
-            self._ensure_vector_index(len(source_embedding))
+            self._ensure_vector_index(len(source_embedding), user_id=uid)
 
             source_node = self._search_node_by_embedding(
                 source_embedding, filters, "source_candidate"
@@ -547,19 +607,19 @@ class MemoryGraph:
             )
 
             if not dest_node and source_node:
-                merge_props = ["name: $destination_name", "user_id: $user_id"]
-                if agent_id:
-                    merge_props.append("agent_id: $agent_id")
-                if run_id:
-                    merge_props.append("run_id: $run_id")
-                merge_props_str = ", ".join(merge_props)
+                dest_merge_str, params = self._build_node_props(
+                    filters, include_name=True, name_param="destination_name"
+                )
+                params["source_id"] = source_node
+                params["destination_name"] = destination
+                params["destination_embedding"] = dest_embedding
 
                 cypher = f"""
                 MATCH (source)
                 WHERE id(source) = $source_id
                 SET source.mentions = coalesce(source.mentions, 0) + 1
                 WITH source
-                MERGE (destination {destination_label} {{{merge_props_str}}})
+                MERGE (destination {destination_label} {{{dest_merge_str}}})
                 ON CREATE SET
                     destination.created = timestamp(),
                     destination.mentions = 1,
@@ -577,31 +637,21 @@ class MemoryGraph:
                     r.mentions = coalesce(r.mentions, 0) + 1
                 RETURN source.name AS source, type(r) AS relationship, destination.name AS target
                 """
-                params = {
-                    "source_id": source_node,
-                    "destination_name": destination,
-                    "destination_embedding": dest_embedding,
-                    "user_id": user_id,
-                }
-                if agent_id:
-                    params["agent_id"] = agent_id
-                if run_id:
-                    params["run_id"] = run_id
 
             elif dest_node and not source_node:
-                merge_props = ["name: $source_name", "user_id: $user_id"]
-                if agent_id:
-                    merge_props.append("agent_id: $agent_id")
-                if run_id:
-                    merge_props.append("run_id: $run_id")
-                merge_props_str = ", ".join(merge_props)
+                src_merge_str, params = self._build_node_props(
+                    filters, include_name=True, name_param="source_name"
+                )
+                params["destination_id"] = dest_node
+                params["source_name"] = source
+                params["source_embedding"] = source_embedding
 
                 cypher = f"""
                 MATCH (destination)
                 WHERE id(destination) = $destination_id
                 SET destination.mentions = coalesce(destination.mentions, 0) + 1
                 WITH destination
-                MERGE (source {source_label} {{{merge_props_str}}})
+                MERGE (source {source_label} {{{src_merge_str}}})
                 ON CREATE SET
                     source.created = timestamp(),
                     source.mentions = 1,
@@ -619,18 +669,12 @@ class MemoryGraph:
                     r.mentions = coalesce(r.mentions, 0) + 1
                 RETURN source.name AS source, type(r) AS relationship, destination.name AS target
                 """
-                params = {
-                    "destination_id": dest_node,
-                    "source_name": source,
-                    "source_embedding": source_embedding,
-                    "user_id": user_id,
-                }
-                if agent_id:
-                    params["agent_id"] = agent_id
-                if run_id:
-                    params["run_id"] = run_id
 
             elif source_node and dest_node:
+                _, params = self._build_node_props(filters)
+                params["source_id"] = source_node
+                params["destination_id"] = dest_node
+
                 cypher = f"""
                 MATCH (source)
                 WHERE id(source) = $source_id
@@ -647,28 +691,19 @@ class MemoryGraph:
                 ON MATCH SET r.mentions = coalesce(r.mentions, 0) + 1
                 RETURN source.name AS source, type(r) AS relationship, destination.name AS target
                 """
-                params = {
-                    "source_id": source_node,
-                    "destination_id": dest_node,
-                    "user_id": user_id,
-                }
-                if agent_id:
-                    params["agent_id"] = agent_id
-                if run_id:
-                    params["run_id"] = run_id
 
             else:
-                # Neither node exists — create both
-                source_props = ["name: $source_name", "user_id: $user_id"]
-                dest_props = ["name: $dest_name", "user_id: $user_id"]
-                if agent_id:
-                    source_props.append("agent_id: $agent_id")
-                    dest_props.append("agent_id: $agent_id")
-                if run_id:
-                    source_props.append("run_id: $run_id")
-                    dest_props.append("run_id: $run_id")
-                source_props_str = ", ".join(source_props)
-                dest_props_str = ", ".join(dest_props)
+                # Neither node exists - create both
+                source_props_str, params = self._build_node_props(
+                    filters, include_name=True, name_param="source_name"
+                )
+                dest_props_str, _ = self._build_node_props(
+                    filters, include_name=True, name_param="dest_name"
+                )
+                params["source_name"] = source
+                params["dest_name"] = destination
+                params["source_embedding"] = source_embedding
+                params["dest_embedding"] = dest_embedding
 
                 cypher = f"""
                 MERGE (source {source_label} {{{source_props_str}}})
@@ -692,19 +727,8 @@ class MemoryGraph:
                 ON MATCH SET rel.mentions = coalesce(rel.mentions, 0) + 1
                 RETURN source.name AS source, type(rel) AS relationship, destination.name AS target
                 """
-                params = {
-                    "source_name": source,
-                    "dest_name": destination,
-                    "source_embedding": source_embedding,
-                    "dest_embedding": dest_embedding,
-                    "user_id": user_id,
-                }
-                if agent_id:
-                    params["agent_id"] = agent_id
-                if run_id:
-                    params["run_id"] = run_id
 
-            result = self.graph.query(cypher, params=params)
+            result = self.graph.query(cypher, params=params, user_id=uid)
             results.append(result)
         return results
 
@@ -718,16 +742,23 @@ class MemoryGraph:
         Returns the node id (integer) if found, or None.
         Uses FalkorDB's db.idx.vector.queryNodes procedure.
         """
+        uid = self._user_id(filters)
         label = "__Entity__" if self.use_base_label else "Node"
+
+        where_clauses = ["score >= $threshold"]
+        if not self.multi_graph:
+            where_clauses.append("node.user_id = $user_id")
+        if filters.get("agent_id"):
+            where_clauses.append("node.agent_id = $agent_id")
+        if filters.get("run_id"):
+            where_clauses.append("node.run_id = $run_id")
+        where_str = " AND ".join(where_clauses)
 
         cypher = f"""
         CALL db.idx.vector.queryNodes('{label}', 'embedding', 10, vecf32($embedding))
         YIELD node, score
         WITH node, score
-        WHERE node.user_id = $user_id
-        {"AND node.agent_id = $agent_id" if filters.get("agent_id") else ""}
-        {"AND node.run_id = $run_id" if filters.get("run_id") else ""}
-        AND score >= $threshold
+        WHERE {where_str}
         ORDER BY score DESC
         LIMIT 1
         RETURN id(node) AS node_id
@@ -735,15 +766,16 @@ class MemoryGraph:
 
         params = {
             "embedding": embedding,
-            "user_id": filters["user_id"],
             "threshold": self.threshold,
         }
+        if not self.multi_graph:
+            params["user_id"] = filters["user_id"]
         if filters.get("agent_id"):
             params["agent_id"] = filters["agent_id"]
         if filters.get("run_id"):
             params["run_id"] = filters["run_id"]
 
-        result = self.graph.query(cypher, params=params)
+        result = self.graph.query(cypher, params=params, user_id=uid)
         if result:
             return result[0]["node_id"]
         return None

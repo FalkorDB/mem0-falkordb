@@ -28,6 +28,29 @@ def mock_config():
     config.graph_store.config.username = None
     config.graph_store.config.password = None
     config.graph_store.config.base_label = True
+    config.graph_store.config.multi_graph = True
+    config.graph_store.llm = None
+    config.graph_store.custom_prompt = None
+    config.graph_store.threshold = 0.7
+    config.llm.provider = "openai"
+    config.llm.config = MagicMock()
+    config.embedder.provider = "openai"
+    config.embedder.config = MagicMock()
+    config.vector_store.config = MagicMock()
+    return config
+
+
+@pytest.fixture
+def mock_config_single_graph():
+    """Provide a mock config with multi_graph=False."""
+    config = MagicMock()
+    config.graph_store.config.host = "localhost"
+    config.graph_store.config.port = 6379
+    config.graph_store.config.database = "mem0"
+    config.graph_store.config.username = None
+    config.graph_store.config.password = None
+    config.graph_store.config.base_label = True
+    config.graph_store.config.multi_graph = False
     config.graph_store.llm = None
     config.graph_store.custom_prompt = None
     config.graph_store.threshold = 0.7
@@ -59,8 +82,8 @@ def test_memory_graph_init(mock_falkordb, mock_config):
         mock_db.assert_called_once_with(host="localhost", port=6379)
 
 
-def test_delete_all(mock_falkordb, mock_config):
-    """delete_all should execute DETACH DELETE with proper filters."""
+def test_delete_all_multi_graph(mock_falkordb, mock_config):
+    """In multi-graph mode, delete_all drops the user's graph."""
     mock_db, mock_graph = mock_falkordb
 
     with (
@@ -75,12 +98,32 @@ def test_delete_all(mock_falkordb, mock_config):
         mg = MemoryGraph(mock_config)
         mg.delete_all({"user_id": "alice"})
 
-        # The wrapper's query should have been called with DETACH DELETE
-        calls = mg.graph._graph.query.call_args_list
+        # In multi-graph mode, it deletes the entire user graph
+        mock_db.return_value.select_graph.assert_any_call("mem0_alice")
+
+
+def test_delete_all_single_graph(mock_falkordb, mock_config_single_graph):
+    """In single-graph mode, delete_all uses DETACH DELETE with user_id filter."""
+    mock_db, mock_graph = mock_falkordb
+
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
+        mock_emb.create.return_value = MagicMock()
+        mock_llm.create.return_value = MagicMock()
+
+        from mem0_falkordb.graph_memory import MemoryGraph
+
+        mg = MemoryGraph(mock_config_single_graph)
+        mg.delete_all({"user_id": "alice"})
+
+        # In single-graph mode, it uses DETACH DELETE with user_id filter
+        calls = mg.graph._default_graph.query.call_args_list
         assert any("DETACH DELETE" in str(c) for c in calls)
 
 
-def test_reset(mock_falkordb, mock_config):
+def test_reset(mock_falkordb, mock_config_single_graph):
     """reset() should clear the entire graph."""
     mock_db, mock_graph = mock_falkordb
 
@@ -93,15 +136,15 @@ def test_reset(mock_falkordb, mock_config):
 
         from mem0_falkordb.graph_memory import MemoryGraph
 
-        mg = MemoryGraph(mock_config)
+        mg = MemoryGraph(mock_config_single_graph)
         mg.reset()
 
-        calls = mg.graph._graph.query.call_args_list
+        calls = mg.graph._default_graph.query.call_args_list
         assert any("MATCH (n) DETACH DELETE n" in str(c) for c in calls)
 
 
-def test_get_all(mock_falkordb, mock_config):
-    """get_all should return formatted results."""
+def test_get_all_multi_graph(mock_falkordb, mock_config):
+    """get_all should return formatted results using per-user graph."""
     mock_db, mock_graph = mock_falkordb
 
     # Set up mock to return a result
@@ -126,3 +169,32 @@ def test_get_all(mock_falkordb, mock_config):
         assert results[0]["source"] == "alice"
         assert results[0]["relationship"] == "likes"
         assert results[0]["target"] == "pizza"
+        # Verify it selected the user-specific graph
+        mock_db.return_value.select_graph.assert_any_call("mem0_alice")
+
+
+def test_get_all_single_graph(mock_falkordb, mock_config_single_graph):
+    """get_all in single-graph mode uses user_id filter."""
+    mock_db, mock_graph = mock_falkordb
+
+    mock_result = MagicMock()
+    mock_result.result_set = [["alice", "likes", "pizza"]]
+    mock_result.header = ["source", "relationship", "target"]
+    mock_graph.query.return_value = mock_result
+
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
+        mock_emb.create.return_value = MagicMock()
+        mock_llm.create.return_value = MagicMock()
+
+        from mem0_falkordb.graph_memory import MemoryGraph
+
+        mg = MemoryGraph(mock_config_single_graph)
+        results = mg.get_all({"user_id": "alice"}, limit=10)
+
+        assert len(results) == 1
+        # Verify query used user_id filter
+        calls = mg.graph._default_graph.query.call_args_list
+        assert any("user_id" in str(c) for c in calls)
