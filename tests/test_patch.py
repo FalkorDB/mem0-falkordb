@@ -1,6 +1,13 @@
 """Tests for the register/patch mechanism."""
 
 
+def test_auto_register_on_import():
+    """Importing mem0_falkordb should auto-register the provider."""
+    import mem0_falkordb  # noqa: F401
+
+    from mem0.utils.factory import GraphStoreFactory
+
+    assert "falkordb" in GraphStoreFactory.provider_to_class
 
 
 def test_register_adds_falkordb_to_factory():
