@@ -17,11 +17,9 @@ pip install mem0ai
 ## Quick Start
 
 ```python
-# 1. Register the FalkorDB plugin
 from mem0_falkordb import register
 register()
 
-# 2. Use Mem0 as normal with the "falkordb" provider
 from mem0 import Memory
 
 config = {

@@ -1,8 +1,6 @@
 """Tests for the register/patch mechanism."""
 
 
-
-
 def test_register_adds_falkordb_to_factory():
     """After register(), GraphStoreFactory should know about 'falkordb'."""
     from mem0_falkordb import register
