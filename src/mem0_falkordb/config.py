@@ -7,9 +7,15 @@ class FalkorDBConfig(BaseModel):
     host: str = Field("localhost", description="Host address for the FalkorDB server")
     port: int = Field(6379, description="Port for the FalkorDB server")
     database: str = Field("mem0", description="Graph name in FalkorDB")
-    username: Optional[str] = Field(None, description="Username for FalkorDB authentication")
-    password: Optional[str] = Field(None, description="Password for FalkorDB authentication")
-    base_label: Optional[bool] = Field(True, description="Whether to use base node label __Entity__ for all entities")
+    username: Optional[str] = Field(
+        None, description="Username for FalkorDB authentication"
+    )
+    password: Optional[str] = Field(
+        None, description="Password for FalkorDB authentication"
+    )
+    base_label: Optional[bool] = Field(
+        True, description="Whether to use base node label __Entity__ for all entities"
+    )
 
     @model_validator(mode="before")
     def check_host_and_port(cls, values):

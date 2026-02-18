@@ -14,7 +14,13 @@ def test_default_config():
 
 
 def test_custom_config():
-    config = FalkorDBConfig(host="db.example.com", port=6380, database="test_graph", username="admin", password="secret")
+    config = FalkorDBConfig(
+        host="db.example.com",
+        port=6380,
+        database="test_graph",
+        username="admin",
+        password="secret",
+    )
     assert config.host == "db.example.com"
     assert config.port == 6380
     assert config.database == "test_graph"

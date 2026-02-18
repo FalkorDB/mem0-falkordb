@@ -7,12 +7,16 @@ from mem0.memory.utils import format_entities, sanitize_relationship_for_cypher
 try:
     from falkordb import FalkorDB
 except ImportError:
-    raise ImportError("falkordb is not installed. Please install it using pip install falkordb")
+    raise ImportError(
+        "falkordb is not installed. Please install it using pip install falkordb"
+    )
 
 try:
     from rank_bm25 import BM25Okapi
 except ImportError:
-    raise ImportError("rank_bm25 is not installed. Please install it using pip install rank-bm25")
+    raise ImportError(
+        "rank_bm25 is not installed. Please install it using pip install rank-bm25"
+    )
 
 from mem0.graphs.tools import (
     DELETE_MEMORY_STRUCT_TOOL_GRAPH,
@@ -60,10 +64,14 @@ class MemoryGraph:
             password=self.config.graph_store.config.password,
         )
         self.embedding_model = EmbedderFactory.create(
-            self.config.embedder.provider, self.config.embedder.config, self.config.vector_store.config
+            self.config.embedder.provider,
+            self.config.embedder.config,
+            self.config.vector_store.config,
         )
 
-        self.use_base_label = getattr(self.config.graph_store.config, "base_label", True)
+        self.use_base_label = getattr(
+            self.config.graph_store.config, "base_label", True
+        )
         self.node_label = ":`__Entity__`" if self.use_base_label else ""
 
         if self.use_base_label:
@@ -76,18 +84,30 @@ class MemoryGraph:
         self.llm_provider = "openai"
         if self.config.llm and self.config.llm.provider:
             self.llm_provider = self.config.llm.provider
-        if self.config.graph_store and self.config.graph_store.llm and self.config.graph_store.llm.provider:
+        if (
+            self.config.graph_store
+            and self.config.graph_store.llm
+            and self.config.graph_store.llm.provider
+        ):
             self.llm_provider = self.config.graph_store.llm.provider
 
         # Get LLM config with proper null checks
         llm_config = None
-        if self.config.graph_store and self.config.graph_store.llm and hasattr(self.config.graph_store.llm, "config"):
+        if (
+            self.config.graph_store
+            and self.config.graph_store.llm
+            and hasattr(self.config.graph_store.llm, "config")
+        ):
             llm_config = self.config.graph_store.llm.config
         elif hasattr(self.config.llm, "config"):
             llm_config = self.config.llm.config
         self.llm = LlmFactory.create(self.llm_provider, llm_config)
         self.user_id = None
-        self.threshold = self.config.graph_store.threshold if hasattr(self.config.graph_store, "threshold") else 0.7
+        self.threshold = (
+            self.config.graph_store.threshold
+            if hasattr(self.config.graph_store, "threshold")
+            else 0.7
+        )
 
     # ------------------------------------------------------------------
     # Index management
@@ -124,9 +144,15 @@ class MemoryGraph:
     def add(self, data, filters):
         """Add data to the graph."""
         entity_type_map = self._retrieve_nodes_from_data(data, filters)
-        to_be_added = self._establish_nodes_relations_from_data(data, filters, entity_type_map)
-        search_output = self._search_graph_db(node_list=list(entity_type_map.keys()), filters=filters)
-        to_be_deleted = self._get_delete_entities_from_search_output(search_output, data, filters)
+        to_be_added = self._establish_nodes_relations_from_data(
+            data, filters, entity_type_map
+        )
+        search_output = self._search_graph_db(
+            node_list=list(entity_type_map.keys()), filters=filters
+        )
+        to_be_deleted = self._get_delete_entities_from_search_output(
+            search_output, data, filters
+        )
 
         deleted_entities = self._delete_entities(to_be_deleted, filters)
         added_entities = self._add_entities(to_be_added, filters, entity_type_map)
@@ -136,13 +162,16 @@ class MemoryGraph:
     def search(self, query, filters, limit=100):
         """Search for memories and related graph data."""
         entity_type_map = self._retrieve_nodes_from_data(query, filters)
-        search_output = self._search_graph_db(node_list=list(entity_type_map.keys()), filters=filters)
+        search_output = self._search_graph_db(
+            node_list=list(entity_type_map.keys()), filters=filters
+        )
 
         if not search_output:
             return []
 
         search_outputs_sequence = [
-            [item["source"], item["relationship"], item["destination"]] for item in search_output
+            [item["source"], item["relationship"], item["destination"]]
+            for item in search_output
         ]
         bm25 = BM25Okapi(search_outputs_sequence)
 
@@ -151,7 +180,9 @@ class MemoryGraph:
 
         search_results = []
         for item in reranked_results:
-            search_results.append({"source": item[0], "relationship": item[1], "destination": item[2]})
+            search_results.append(
+                {"source": item[0], "relationship": item[1], "destination": item[2]}
+            )
 
         logger.info(f"Returned {len(search_results)} search results")
         return search_results
@@ -246,7 +277,10 @@ class MemoryGraph:
                 f"Error in search tool: {e}, llm_provider={self.llm_provider}, search_results={search_results}"
             )
 
-        entity_type_map = {k.lower().replace(" ", "_"): v.lower().replace(" ", "_") for k, v in entity_type_map.items()}
+        entity_type_map = {
+            k.lower().replace(" ", "_"): v.lower().replace(" ", "_")
+            for k, v in entity_type_map.items()
+        }
         logger.debug(f"Entity type map: {entity_type_map}")
         return entity_type_map
 
@@ -260,7 +294,9 @@ class MemoryGraph:
 
         if self.config.graph_store.custom_prompt:
             system_content = EXTRACT_RELATIONS_PROMPT.replace("USER_ID", user_identity)
-            system_content = system_content.replace("CUSTOM_PROMPT", f"4. {self.config.graph_store.custom_prompt}")
+            system_content = system_content.replace(
+                "CUSTOM_PROMPT", f"4. {self.config.graph_store.custom_prompt}"
+            )
             messages = [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": data},
@@ -269,7 +305,10 @@ class MemoryGraph:
             system_content = EXTRACT_RELATIONS_PROMPT.replace("USER_ID", user_identity)
             messages = [
                 {"role": "system", "content": system_content},
-                {"role": "user", "content": f"List of entities: {list(entity_type_map.keys())}. \n\nText: {data}"},
+                {
+                    "role": "user",
+                    "content": f"List of entities: {list(entity_type_map.keys())}. \n\nText: {data}",
+                },
             ]
 
         _tools = [RELATIONS_TOOL]
@@ -283,7 +322,11 @@ class MemoryGraph:
 
         entities = []
         if extracted_entities.get("tool_calls"):
-            entities = extracted_entities["tool_calls"][0].get("arguments", {}).get("entities", [])
+            entities = (
+                extracted_entities["tool_calls"][0]
+                .get("arguments", {})
+                .get("entities", [])
+            )
 
         entities = self._remove_spaces_from_entities(entities)
         logger.debug(f"Extracted entities: {entities}")
@@ -299,7 +342,9 @@ class MemoryGraph:
         if filters.get("run_id"):
             user_identity += f", run_id: {filters['run_id']}"
 
-        system_prompt, user_prompt = get_delete_messages(search_output_string, data, user_identity)
+        system_prompt, user_prompt = get_delete_messages(
+            search_output_string, data, user_identity
+        )
 
         _tools = [DELETE_MEMORY_TOOL_GRAPH]
         if self.llm_provider in ["azure_openai_structured", "openai_structured"]:
@@ -483,15 +528,23 @@ class MemoryGraph:
             source_label = self.node_label if self.node_label else f":`{source_type}`"
             source_extra_set = f", source:`{source_type}`" if self.node_label else ""
             destination_type = entity_type_map.get(destination, "__User__")
-            destination_label = self.node_label if self.node_label else f":`{destination_type}`"
-            destination_extra_set = f", destination:`{destination_type}`" if self.node_label else ""
+            destination_label = (
+                self.node_label if self.node_label else f":`{destination_type}`"
+            )
+            destination_extra_set = (
+                f", destination:`{destination_type}`" if self.node_label else ""
+            )
 
             source_embedding = self.embedding_model.embed(source)
             dest_embedding = self.embedding_model.embed(destination)
             self._ensure_vector_index(len(source_embedding))
 
-            source_node = self._search_node_by_embedding(source_embedding, filters, "source_candidate")
-            dest_node = self._search_node_by_embedding(dest_embedding, filters, "destination_candidate")
+            source_node = self._search_node_by_embedding(
+                source_embedding, filters, "source_candidate"
+            )
+            dest_node = self._search_node_by_embedding(
+                dest_embedding, filters, "destination_candidate"
+            )
 
             if not dest_node and source_node:
                 merge_props = ["name: $destination_name", "user_id: $user_id"]
@@ -702,6 +755,8 @@ class MemoryGraph:
     def _remove_spaces_from_entities(self, entity_list):
         for item in entity_list:
             item["source"] = item["source"].lower().replace(" ", "_")
-            item["relationship"] = sanitize_relationship_for_cypher(item["relationship"].lower().replace(" ", "_"))
+            item["relationship"] = sanitize_relationship_for_cypher(
+                item["relationship"].lower().replace(" ", "_")
+            )
             item["destination"] = item["destination"].lower().replace(" ", "_")
         return entity_list

@@ -44,12 +44,20 @@ def _patch_factory():
     """Add FalkorDB to GraphStoreFactory.provider_to_class."""
     from mem0.utils.factory import GraphStoreFactory
 
-    GraphStoreFactory.provider_to_class["falkordb"] = "mem0_falkordb.graph_memory.MemoryGraph"
+    GraphStoreFactory.provider_to_class["falkordb"] = (
+        "mem0_falkordb.graph_memory.MemoryGraph"
+    )
 
 
 def _patch_config():
     """Patch GraphStoreConfig to accept FalkorDBConfig."""
-    from mem0.graphs.configs import GraphStoreConfig, KuzuConfig, MemgraphConfig, Neo4jConfig, NeptuneConfig
+    from mem0.graphs.configs import (
+        GraphStoreConfig,
+        KuzuConfig,
+        MemgraphConfig,
+        Neo4jConfig,
+        NeptuneConfig,
+    )
 
     # 1. Update the Union type annotation to include FalkorDBConfig
     GraphStoreConfig.model_fields["config"].annotation = Union[

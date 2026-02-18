@@ -14,7 +14,10 @@ def test_register_adds_falkordb_to_factory():
     from mem0.utils.factory import GraphStoreFactory
 
     assert "falkordb" in GraphStoreFactory.provider_to_class
-    assert GraphStoreFactory.provider_to_class["falkordb"] == "mem0_falkordb.graph_memory.MemoryGraph"
+    assert (
+        GraphStoreFactory.provider_to_class["falkordb"]
+        == "mem0_falkordb.graph_memory.MemoryGraph"
+    )
 
 
 def test_register_is_idempotent():
@@ -53,7 +56,11 @@ def test_existing_providers_still_work():
 
     config = GraphStoreConfig(
         provider="neo4j",
-        config={"url": "bolt://localhost:7687", "username": "neo4j", "password": "password"},
+        config={
+            "url": "bolt://localhost:7687",
+            "username": "neo4j",
+            "password": "password",
+        },
     )
     assert config.provider == "neo4j"
     assert config.config.url == "bolt://localhost:7687"

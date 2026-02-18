@@ -43,8 +43,10 @@ def test_memory_graph_init(mock_falkordb, mock_config):
     """MemoryGraph should initialize and connect to FalkorDB."""
     mock_db, mock_graph = mock_falkordb
 
-    with patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb, \
-         patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm:
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
         mock_emb.create.return_value = MagicMock()
         mock_llm.create.return_value = MagicMock()
 
@@ -61,8 +63,10 @@ def test_delete_all(mock_falkordb, mock_config):
     """delete_all should execute DETACH DELETE with proper filters."""
     mock_db, mock_graph = mock_falkordb
 
-    with patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb, \
-         patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm:
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
         mock_emb.create.return_value = MagicMock()
         mock_llm.create.return_value = MagicMock()
 
@@ -80,8 +84,10 @@ def test_reset(mock_falkordb, mock_config):
     """reset() should clear the entire graph."""
     mock_db, mock_graph = mock_falkordb
 
-    with patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb, \
-         patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm:
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
         mock_emb.create.return_value = MagicMock()
         mock_llm.create.return_value = MagicMock()
 
@@ -104,8 +110,10 @@ def test_get_all(mock_falkordb, mock_config):
     mock_result.header = ["source", "relationship", "target"]
     mock_graph.query.return_value = mock_result
 
-    with patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb, \
-         patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm:
+    with (
+        patch("mem0_falkordb.graph_memory.EmbedderFactory") as mock_emb,
+        patch("mem0_falkordb.graph_memory.LlmFactory") as mock_llm,
+    ):
         mock_emb.create.return_value = MagicMock()
         mock_llm.create.return_value = MagicMock()
 
