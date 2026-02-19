@@ -348,6 +348,7 @@ class TestFullStack:
                 "provider": "openai",
                 "config": {
                     "model": "openai/text-embedding-3-small",
+                    "embedding_dims": 1536,
                     "openai_base_url": _GITHUB_MODELS_BASE_URL,
                     "api_key": os.environ["GITHUB_TOKEN"],
                 },
