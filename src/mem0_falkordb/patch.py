@@ -85,3 +85,8 @@ def _patch_config():
 
     # 3. Rebuild the Pydantic model to recompile with patched validators and types
     GraphStoreConfig.model_rebuild(force=True)
+
+    # 4. Rebuild MemoryConfig so it picks up the patched GraphStoreConfig
+    from mem0.configs.base import MemoryConfig
+
+    MemoryConfig.model_rebuild(force=True)
