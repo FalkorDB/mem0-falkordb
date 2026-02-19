@@ -474,8 +474,6 @@ class MemoryGraph:
             YIELD node, score
             WITH node, score
             WHERE {where_str}
-            WITH node, score
-            ORDER BY score DESC
             LIMIT $limit
             RETURN id(node) AS node_id, node.name AS node_name, score
             """
@@ -748,7 +746,6 @@ class MemoryGraph:
         YIELD node, score
         WITH node, score
         WHERE {where_str}
-        ORDER BY score DESC
         LIMIT 1
         RETURN id(node) AS node_id
         """
