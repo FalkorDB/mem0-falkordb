@@ -105,6 +105,3 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## License
-
-Apache-2.0
