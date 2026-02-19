@@ -288,19 +288,17 @@ class MemoryGraph:
         """Retrieve all nodes and relationships from the graph."""
         uid = self._user_id(filters)
         node_props_str, params = self._build_node_props(filters)
-        params["limit"] = limit
-
         if node_props_str:
             query = f"""
             MATCH (n {self.node_label} {{{node_props_str}}})-[r]->(m {self.node_label})
             RETURN n.name AS source, type(r) AS relationship, m.name AS target
-            LIMIT $limit
+            LIMIT {int(limit)}
             """
         else:
             query = f"""
             MATCH (n {self.node_label})-[r]->(m {self.node_label})
             RETURN n.name AS source, type(r) AS relationship, m.name AS target
-            LIMIT $limit
+            LIMIT {int(limit)}
             """
         results = self.graph.query(query, params=params, user_id=uid)
 
@@ -470,18 +468,17 @@ class MemoryGraph:
             where_str = " AND ".join(where_clauses)
 
             vector_query = f"""
-            CALL db.idx.vector.queryNodes('{label}', 'embedding', $limit, vecf32($n_embedding))
+            CALL db.idx.vector.queryNodes('{label}', 'embedding', {int(limit)}, vecf32($n_embedding))
             YIELD node, score
             WITH node, score
             WHERE {where_str}
-            LIMIT $limit
+            LIMIT {int(limit)}
             RETURN id(node) AS node_id, node.name AS node_name, score
             """
 
             params = {
                 "n_embedding": n_embedding,
                 "threshold": self.threshold,
-                "limit": limit,
                 **base_params,
             }
 
