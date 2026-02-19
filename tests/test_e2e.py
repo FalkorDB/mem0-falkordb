@@ -320,6 +320,20 @@ class TestFullStack:
         """Set up a Memory instance with FalkorDB + GitHub Models API."""
         import os
 
+        from openai import OpenAI, PermissionDeniedError
+
+        # Verify the token has models API access before running tests
+        client = OpenAI(
+            api_key=os.environ["GITHUB_TOKEN"],
+            base_url=_GITHUB_MODELS_BASE_URL,
+        )
+        try:
+            client.embeddings.create(
+                model="openai/text-embedding-3-small", input=["test"]
+            )
+        except PermissionDeniedError:
+            pytest.skip("GITHUB_TOKEN does not have models:read permission")
+
         from mem0_falkordb import register
 
         register()
