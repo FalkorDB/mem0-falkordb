@@ -70,7 +70,8 @@ class _FalkorDBGraphWrapper:
         result = graph.query(cypher, params=params)
         if not result.result_set:
             return []
-        header = result.header
+        # FalkorDB headers are [column_type, column_name] pairs
+        header = [h[1] if isinstance(h, (list, tuple)) else h for h in result.header]
         return [dict(zip(header, row)) for row in result.result_set]
 
     def delete_graph(self, user_id):
