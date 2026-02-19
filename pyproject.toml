@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mem0-falkordb"
-version = "0.2.0"
+version = "0.3.0"
 description = "FalkorDB graph store plugin for Mem0"
 readme = "README.md"
-license = "Apache-2.0"
-requires-python = ">=3.9"
+license = "MIT"
+requires-python = ">=3.10"
 authors = [
     { name = "mem0-falkordb contributors" },
 ]
@@ -16,7 +16,7 @@ keywords = ["mem0", "falkordb", "graph", "memory", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
