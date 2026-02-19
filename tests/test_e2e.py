@@ -287,3 +287,97 @@ class TestMemoryGraphIntegration:
     def test_node_label_matches_config(self, memory_graph):
         """When base_label is True, node_label should be :`__Entity__`."""
         assert memory_graph.node_label == ":`__Entity__`"
+
+
+# ---------------------------------------------------------------------------
+# Full-stack tests (register → Memory.from_config → add/search)
+# Uses GitHub Models API (requires GITHUB_TOKEN env var)
+# ---------------------------------------------------------------------------
+
+_GITHUB_MODELS_BASE_URL = "https://models.github.ai/inference"
+
+
+def _github_token():
+    """Return GITHUB_TOKEN if set, else None."""
+    import os
+
+    return os.environ.get("GITHUB_TOKEN")
+
+
+skip_no_github_token = pytest.mark.skipif(
+    not _github_token(),
+    reason="GITHUB_TOKEN is not set",
+)
+
+
+@skip_no_falkordb
+@skip_no_github_token
+class TestFullStack:
+    """Full-stack tests: register → Memory.from_config → add/search/get_all."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, unique_db):
+        """Set up a Memory instance with FalkorDB + GitHub Models API."""
+        import os
+
+        from mem0_falkordb import register
+
+        register()
+
+        from mem0 import Memory
+
+        self.user_id = f"user_{uuid.uuid4().hex[:8]}"
+        config = {
+            "graph_store": {
+                "provider": "falkordb",
+                "config": {
+                    "host": "localhost",
+                    "port": 6379,
+                    "database": unique_db,
+                },
+            },
+            "llm": {
+                "provider": "openai",
+                "config": {
+                    "model": "openai/gpt-4.1-nano",
+                    "openai_base_url": _GITHUB_MODELS_BASE_URL,
+                    "api_key": os.environ["GITHUB_TOKEN"],
+                },
+            },
+            "embedder": {
+                "provider": "openai",
+                "config": {
+                    "model": "openai/text-embedding-3-small",
+                    "openai_base_url": _GITHUB_MODELS_BASE_URL,
+                    "api_key": os.environ["GITHUB_TOKEN"],
+                },
+            },
+        }
+        self.memory = Memory.from_config(config)
+        yield
+        # Cleanup
+        self.memory.graph.graph.reset_all_graphs()
+
+    def test_add_and_search(self):
+        """Add a memory and search for it."""
+        self.memory.add("I love pizza and pasta", user_id=self.user_id)
+        results = self.memory.search("what food do I like?", user_id=self.user_id)
+        assert len(results) > 0
+
+    def test_add_and_get_all(self):
+        """Add a memory and retrieve all graph relationships."""
+        self.memory.add("Alice works at Acme Corp", user_id=self.user_id)
+        results = self.memory.graph.get_all({"user_id": self.user_id})
+        assert len(results) > 0
+        # Verify the result structure
+        for r in results:
+            assert "source" in r
+            assert "relationship" in r
+            assert "target" in r
+
+    def test_add_and_delete_all(self):
+        """Add a memory, delete all, and verify it's gone."""
+        self.memory.add("Bob likes hiking", user_id=self.user_id)
+        self.memory.graph.delete_all({"user_id": self.user_id})
+        results = self.memory.graph.get_all({"user_id": self.user_id})
+        assert results == []

@@ -72,6 +72,8 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run E2E tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pytest -v -m e2e
 
   lint:
