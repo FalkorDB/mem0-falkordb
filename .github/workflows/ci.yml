@@ -2,6 +2,7 @@ name: CI
 
 permissions:
   contents: read
+  models: read
 
 on:
   push:
