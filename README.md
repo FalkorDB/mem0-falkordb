@@ -51,6 +51,8 @@ m.add("I love pizza", user_id="alice")
 results = m.search("what does alice like?", user_id="alice")
 ```
 
+<img width="1827" height="936" alt="image" src="https://github.com/user-attachments/assets/857c1112-0688-4025-ace0-ac63f195a48a" />
+
 ## Configuration
 
 | Parameter    | Type   | Default     | Description                                |
