@@ -472,8 +472,8 @@ class MemoryGraph:
             YIELD node, score
             WITH node, score
             WHERE {where_str}
-            LIMIT {int(limit)}
             RETURN id(node) AS node_id, node.name AS node_name, score
+            LIMIT {int(limit)}
             """
 
             params = {
@@ -743,8 +743,8 @@ class MemoryGraph:
         YIELD node, score
         WITH node, score
         WHERE {where_str}
-        LIMIT 1
         RETURN id(node) AS node_id
+        LIMIT 1
         """
 
         params = {
