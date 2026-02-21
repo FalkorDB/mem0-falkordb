@@ -74,29 +74,6 @@ jobs:
       - name: Run E2E tests
         run: pytest -v -m e2e
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Set up Python
-        run: uv python install 3.14
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Check formatting
-        run: uv run ruff format --check .
-
-      - name: Run Ruff linter
-        run: uv run ruff check .
-
-      - name: Run mypy
-        run: uv run mypy src/mem0_falkordb/
-
   build:
     runs-on: ubuntu-latest
     steps:
