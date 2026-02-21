@@ -12,6 +12,9 @@ Prerequisites:
 
 Usage:
     python demo.py
+
+    For CI mode (tests initialization only):
+    DEMO_CI_MODE=1 python demo.py
 """
 
 import os
@@ -30,6 +33,9 @@ from mem0_falkordb import register
 register()
 
 console = Console()
+
+# Check if running in CI mode
+CI_MODE = os.getenv("DEMO_CI_MODE", "").lower() in ("1", "true", "yes")
 
 
 def print_section(title: str, emoji: str = "🎬") -> None:
@@ -289,8 +295,8 @@ def main() -> None:
         )
     )
 
-    # Check for OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
+    # Check for OpenAI API key (not required in CI mode)
+    if not CI_MODE and not os.getenv("OPENAI_API_KEY"):
         console.print(
             "[red]Error: OPENAI_API_KEY environment variable not set![/red]\n"
             "Please set it and try again:\n"
@@ -328,7 +334,23 @@ def main() -> None:
         console.print(
             f"[red]Failed to connect to FalkorDB:[/red]\n{e}\n\n"
             "[yellow]Make sure FalkorDB is running:[/yellow]\n"
-            "  docker compose up -d"
+            "  docker run --rm -p 6379:6379 falkordb/falkordb:latest"
+        )
+        return
+
+    # CI mode: just test initialization
+    if CI_MODE:
+        console.print(
+            Panel.fit(
+                "[bold green]CI Validation Complete![/bold green]\n\n"
+                "[cyan]Validated:[/cyan]\n"
+                "✅ Demo script imports successfully\n"
+                "✅ FalkorDB connection works\n"
+                "✅ mem0-falkordb provider registered\n"
+                "✅ Mem0 Memory instance created\n\n"
+                "[dim]Run without DEMO_CI_MODE to see the full demo[/dim]",
+                border_style="green",
+            )
         )
         return
 

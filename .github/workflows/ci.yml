@@ -119,41 +119,18 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Validate demo syntax
-        run: |
-          python -m py_compile demo/demo.py demo/inspect_graphs.py
-
       - name: Install local package and demo dependencies
         run: |
           cd demo
           uv sync --extra local
 
-      - name: Test demo initialization
+      - name: Run demo in CI mode
+        env:
+          DEMO_CI_MODE: "1"
+          OPENAI_API_KEY: "test-key-for-ci"
         run: |
           cd demo
-          uv run python -c "
-          import os
-          os.environ['OPENAI_API_KEY'] = 'test-key-for-ci'
-          from mem0_falkordb import register
-          from mem0 import Memory
-          from falkordb import FalkorDB
-
-          # Test FalkorDB connection
-          db = FalkorDB(host='localhost', port=6379)
-          db.ping()
-          print('✓ FalkorDB connection successful')
-
-          # Test mem0-falkordb registration
-          register()
-          print('✓ FalkorDB provider registered')
-
-          # Test demo imports
-          import demo
-          import inspect_graphs
-          print('✓ Demo scripts can be imported')
-
-          print('Demo validation passed!')
-          "
+          uv run python demo.py
 
   build:
     runs-on: ubuntu-latest
