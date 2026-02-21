@@ -37,6 +37,8 @@ dev = [
     "pytest-cov>=4.0",
     "pytest-mock>=3.0",
     "mem0ai",
+    "ruff",
+    "mypy",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -47,3 +49,8 @@ testpaths = ["tests"]
 markers = [
     "e2e: end-to-end tests requiring a running FalkorDB instance",
 ]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+ignore_missing_imports = true  # Start lenient, tighten later
