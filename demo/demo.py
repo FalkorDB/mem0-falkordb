@@ -336,7 +336,7 @@ def main() -> None:
         },
         "llm": {
             "provider": "openai",
-            "config": {"model": "gpt-4o-mini"},
+            "config": {"model": "gpt-5-mini"},
         },
         "embedder": {
             "provider": "openai",
