@@ -97,6 +97,17 @@ jobs:
 
   demo-validation:
     runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v6
 
@@ -117,10 +128,32 @@ jobs:
           cd demo
           uv sync --extra local
 
-      - name: Check demo dependencies can be imported
+      - name: Test demo initialization
         run: |
           cd demo
-          uv run python -c "from mem0 import Memory; from mem0_falkordb import register; from rich.console import Console; from falkordb import FalkorDB; print('Demo dependencies OK')"
+          uv run python -c "
+          import os
+          os.environ['OPENAI_API_KEY'] = 'test-key-for-ci'
+          from mem0_falkordb import register
+          from mem0 import Memory
+          from falkordb import FalkorDB
+
+          # Test FalkorDB connection
+          db = FalkorDB(host='localhost', port=6379)
+          db.ping()
+          print('✓ FalkorDB connection successful')
+
+          # Test mem0-falkordb registration
+          register()
+          print('✓ FalkorDB provider registered')
+
+          # Test demo imports
+          import demo
+          import inspect_graphs
+          print('✓ Demo scripts can be imported')
+
+          print('Demo validation passed!')
+          "
 
   build:
     runs-on: ubuntu-latest
