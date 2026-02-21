@@ -95,7 +95,7 @@ FalkorDB uses different Cypher syntax compared to Neo4j:
 ### Important Implementation Notes
 - **FalkorDB result headers**: `result.header` returns `[[column_type, column_name], ...]` pairs, not plain strings. Extract names with `h[1]`.
 - **No parameterized LIMIT**: FalkorDB's Cypher parser does not support `LIMIT $param`. Use literal integers instead.
-- **Vector embeddings**: Use `vecf32()` to create vector properties, not Neo4j's property setter procedures.
+- **Vector embeddings**: Use `vecf32()` to create vector properties, not the Neo4j property setter procedures.
 
 ## CI/CD
 - **`ci.yml`**:
