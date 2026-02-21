@@ -65,7 +65,7 @@ See the [`demo/`](demo/) directory for a comprehensive multi-user demonstration 
 ```bash
 docker run --rm -p 6379:6379 falkordb/falkordb:latest
 cd demo
-uv sync --extra local
+uv sync
 export OPENAI_API_KEY='your-key-here'
 uv run python demo.py
 ```

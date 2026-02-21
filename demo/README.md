@@ -47,7 +47,7 @@ This starts FalkorDB on `localhost:6379`.
 Using uv (recommended):
 ```bash
 cd demo
-uv sync --extra local
+uv sync
 ```
 
 Alternative using pip:

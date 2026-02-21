@@ -122,7 +122,7 @@ jobs:
       - name: Install local package and demo dependencies
         run: |
           cd demo
-          uv sync --extra local
+          uv sync
 
       - name: Run demo in CI mode
         env:
