@@ -90,10 +90,30 @@ jobs:
           pip install ruff
 
       - name: Check formatting
-        run: ruff format --check src/ tests/
+        run: ruff format --check src/ tests/ demo/
 
       - name: Lint
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ demo/
+
+  demo-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Validate demo syntax
+        run: |
+          python -m py_compile demo/demo.py demo/inspect_graphs.py
+
+      - name: Check demo can import dependencies
+        run: |
+          cd demo
+          pip install -r requirements.txt
+          python -c "import demo; import inspect_graphs; print('Demo imports OK')"
 
   build:
     runs-on: ubuntu-latest
