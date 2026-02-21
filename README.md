@@ -53,6 +53,25 @@ results = m.search("what does alice like?", user_id="alice")
 
 <img width="1827" height="936" alt="image" src="https://github.com/user-attachments/assets/857c1112-0688-4025-ace0-ac63f195a48a" />
 
+## Demo
+
+See the [`demo/`](demo/) directory for a comprehensive multi-user demonstration showcasing:
+- **Graph-structured memory** — relationships between entities, not just flat facts
+- **Per-user graph isolation** — each user gets their own FalkorDB graph
+- **Context-aware retrieval** — semantic search with vector embeddings
+- **Memory evolution** — updates and conflict resolution
+- **Visual inspection** — see the actual graph structure
+
+```bash
+docker run --rm -p 6379:6379 falkordb/falkordb:latest
+cd demo
+uv sync
+export OPENAI_API_KEY='your-key-here'
+uv run python demo.py
+```
+
+See [demo/README.md](demo/README.md) for complete instructions.
+
 ## Configuration
 
 | Parameter    | Type   | Default     | Description                                |

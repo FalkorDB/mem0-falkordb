@@ -24,3 +24,5 @@ pyspelling
 pytest
 subqueries
 wordlist
+README
+md

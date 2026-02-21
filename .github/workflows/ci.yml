@@ -90,10 +90,47 @@ jobs:
           pip install ruff
 
       - name: Check formatting
-        run: ruff format --check src/ tests/
+        run: ruff format --check src/ tests/ demo/
 
       - name: Lint
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ demo/
+
+  demo-validation:
+    runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install local package and demo dependencies
+        run: |
+          cd demo
+          uv sync
+
+      - name: Run demo in CI mode
+        env:
+          DEMO_CI_MODE: "1"
+          OPENAI_API_KEY: "test-key-for-ci"
+        run: |
+          cd demo
+          uv run python demo.py
 
   build:
     runs-on: ubuntu-latest

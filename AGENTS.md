@@ -64,6 +64,12 @@ tests/
   test_patch.py       # Factory registration and patching tests
   test_graph_memory.py # Core graph operations tests
   test_e2e.py         # End-to-end integration tests (requires FalkorDB instance)
+
+demo/
+  demo.py             # Interactive multi-user demo showcasing graph memory
+  inspect_graphs.py   # Visual graph inspector with rich output
+  pyproject.toml      # Demo dependencies and uv configuration
+  README.md           # Demo usage instructions
 ```
 
 ## Architecture Patterns
