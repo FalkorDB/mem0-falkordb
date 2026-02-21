@@ -113,19 +113,25 @@ def scene_1_onboarding(m: Memory) -> Dict[str, List[str]]:
 
     users = {
         "alice": [
-            "My name is Alice. I'm a vegan software engineer who loves hiking.",
-            "I'm allergic to nuts and I prefer Python over JavaScript.",
-            "I'm planning a trip to Japan next month.",
+            "My name is Alice Chen. I'm a senior software engineer at TechCorp, specializing in backend systems using Python and Django.",
+            "I've been vegan for 5 years and I'm allergic to all tree nuts. My favorite vegan protein sources are tofu, tempeh, and lentils.",
+            "I love hiking in the White Mountains every weekend. My goal is to complete all 48 four-thousand footers in New Hampshire.",
+            "I'm planning a two-week trip to Japan in March to visit Tokyo, Kyoto, and Osaka. I want to explore vegan Japanese cuisine and hike Mount Fuji.",
+            "At work, I prefer Python over JavaScript for backend development. I'm currently leading a project to migrate our REST API to GraphQL using Strawberry.",
         ],
         "bob": [
-            "I'm Bob, a chef specializing in Italian cuisine.",
-            "I have two kids and I coach their soccer team on weekends.",
-            "I'm looking for a new restaurant management software.",
+            "I'm Bob, a chef and restaurant owner specializing in Italian cuisine at my restaurant Bella Napoli in Boston.",
+            "My two kids, Emma and Lucas, both play soccer. I coach their team, the Boston Strikers, every Saturday.",
+            "At the restaurant, I'm known for my handmade pasta and wood-fired pizzas. My signature dish is Carbonara alla Romana.",
+            "I'm looking for restaurant management software to help track inventory, especially for fresh ingredients like San Marzano tomatoes and buffalo mozzarella that I import from Italy.",
+            "On Sundays after soccer practice, I often cook family meals with Emma and Lucas, teaching them traditional Italian recipes I learned from my grandmother in Naples.",
         ],
         "carol": [
-            "I'm Carol, a cardiologist at Boston General Hospital.",
-            "I run marathons and follow a high-protein diet.",
-            "I'm writing a paper on AI in diagnostics.",
+            "I'm Dr. Carol Martinez, a cardiologist at Boston General Hospital specializing in preventive cardiology and sports medicine.",
+            "I've completed 12 marathons including Boston, New York, and Chicago. My personal best is 3 hours 24 minutes at the Chicago Marathon last fall.",
+            "As an athlete-physician, I follow a high-protein Mediterranean diet focused on lean fish, chicken, legumes, and lots of vegetables to support my training.",
+            "I'm currently writing a research paper on using machine learning for early detection of atrial fibrillation in athletes. My co-author is Dr. James Park from MIT's CSAIL.",
+            "I train my cardiology residents on the connection between athletic performance and heart health. Many of my patients are runners who come to me for cardiovascular screening.",
         ],
     }
 
@@ -151,16 +157,19 @@ def scene_2_retrieval(m: Memory, users: Dict[str, List[str]]) -> None:
 
     queries = {
         "alice": [
-            "what should I cook for dinner?",
-            "what are her travel plans?",
+            "what vegan dishes can she eat?",
+            "what are her travel plans and hiking goals?",
+            "what programming languages and frameworks does she use?",
         ],
         "bob": [
-            "what does he do on weekends?",
-            "what software is he looking for?",
+            "what does he do with his children?",
+            "what are his signature dishes at the restaurant?",
+            "what kind of software and ingredients does he need?",
         ],
         "carol": [
-            "what is her research focus?",
-            "what are her dietary habits?",
+            "what is her research about?",
+            "what are her marathon achievements?",
+            "how does her diet support her athletic training?",
         ],
     }
 
@@ -183,14 +192,17 @@ def scene_3_memory_update(m: Memory) -> None:
     user_id = "alice"
 
     console.print(f"[bold]Current diet preference for {user_id}:[/bold]")
-    results = m.search("what is alice's diet?", user_id=user_id)
+    results = m.search("what does alice eat?", user_id=user_id)
     print_memories(results)
 
     console.print(f"\n[yellow]Updating {user_id}'s diet...[/yellow]")
-    m.add("Actually I moved to a pescatarian diet now", user_id=user_id)
+    m.add(
+        "I've transitioned from vegan to pescatarian. I now eat fish and seafood in addition to plant-based foods.",
+        user_id=user_id,
+    )
 
     console.print(f"\n[bold]Updated diet preference for {user_id}:[/bold]")
-    results = m.search("what is alice's diet?", user_id=user_id)
+    results = m.search("what does alice eat?", user_id=user_id)
     print_memories(results)
 
     console.print("\n[green]✓ Memory successfully updated![/green]")
