@@ -329,6 +329,12 @@ def main() -> None:
             "provider": "openai",
             "config": {"model": "text-embedding-3-small"},
         },
+        "vector_store": {
+            "provider": "falkordb",
+            "config": {
+                "embedding_model_dims": 1536,
+            },
+        },
     }
 
     try:
