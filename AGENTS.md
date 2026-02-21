@@ -68,8 +68,7 @@ tests/
 demo/
   demo.py             # Interactive multi-user demo showcasing graph memory
   inspect_graphs.py   # Visual graph inspector with rich output
-  docker-compose.yml  # FalkorDB setup for local testing
-  requirements.txt    # Demo dependencies
+  pyproject.toml      # Demo dependencies and uv configuration
   README.md           # Demo usage instructions
 ```
 

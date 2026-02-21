@@ -50,11 +50,11 @@ cd demo
 uv sync --extra local
 ```
 
-Or using pip:
+Alternative using pip:
 ```bash
-pip install -e ..  # Install local mem0-falkordb package first
 cd demo
-pip install -r requirements.txt
+pip install -e ..  # Install local mem0-falkordb package in editable mode
+pip install mem0ai openai falkordb rich
 ```
 
 ### 3. Set Your OpenAI API Key
