@@ -209,7 +209,8 @@ def scene_4_isolation_proof(m: Memory) -> None:
     print_memories(results)
 
     if not results or all(
-        "marathon" not in r.get("memory", "").lower() for r in results
+        "marathon" not in (r.get("memory", "") if isinstance(r, dict) else r).lower()
+        for r in results
     ):
         console.print(
             "\n[bold green]✓ Isolation confirmed![/bold green] "
