@@ -1,0 +1,16 @@
+aspell
+Codecov
+Cypher
+falkordb
+FalkorDB
+html
+https
+Mem0
+mem0
+mem0ai
+Neo4j
+PyPI
+pyspelling
+pytest
+wordlist
+www
