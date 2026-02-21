@@ -11,8 +11,5 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
-[tool.uv.sources]
-mem0-falkordb = { path = "..", editable = true }
-
 [tool.uv]
 package = false
