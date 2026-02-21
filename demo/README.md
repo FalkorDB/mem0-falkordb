@@ -207,12 +207,9 @@ config = {
     },
     "embedder": {
         "provider": "openai",
-        "config": {"model": "text-embedding-3-small"},
-    },
-    "vector_store": {
-        "provider": "falkordb",
         "config": {
-            "embedding_model_dims": 1536,
+            "model": "text-embedding-3-small",
+            "embedding_dims": 1536,
         },
     },
 }
@@ -223,7 +220,7 @@ You can customize:
 - **database**: Graph name prefix (default: `mem0`)
 - **llm.config.model**: OpenAI model (e.g., `gpt-4`, `gpt-3.5-turbo`)
 - **embedder.config.model**: Embedding model
-- **vector_store.config.embedding_model_dims**: Embedding dimensions (1536 for text-embedding-3-small)
+- **embedder.config.embedding_dims**: Embedding dimensions (1536 for text-embedding-3-small)
 
 ---
 
