@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mem0-falkordb"
-version = "0.4.0"
+version = "0.4.1"
 description = "FalkorDB graph store plugin for Mem0"
 readme = "README.md"
 license = "MIT"
