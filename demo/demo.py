@@ -19,7 +19,7 @@ Usage:
 
 import os
 import time
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from rich.console import Console
 from rich.panel import Panel
@@ -43,7 +43,7 @@ def print_section(title: str, emoji: str = "🎬") -> None:
     console.print(f"\n{emoji} [bold cyan]{title}[/bold cyan]\n")
 
 
-def print_memories(results: List[Dict], title: str = "Retrieved Memories") -> None:
+def print_memories(results: List[Any], title: str = "Retrieved Memories") -> None:
     """Pretty print memory search results."""
     if not results:
         console.print("[yellow]No memories found[/yellow]")
@@ -53,7 +53,11 @@ def print_memories(results: List[Dict], title: str = "Retrieved Memories") -> No
     table.add_column("Memory", style="cyan", no_wrap=False)
 
     for result in results:
-        memory_text = result.get("memory", "N/A")
+        # Handle both dict and string results
+        if isinstance(result, dict):
+            memory_text = result.get("memory", "N/A")
+        else:
+            memory_text = str(result)
         table.add_row(memory_text)
 
     console.print(table)
