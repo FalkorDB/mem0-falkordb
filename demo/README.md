@@ -44,7 +44,15 @@ This starts FalkorDB on `localhost:6379`.
 
 ### 2. Install Python Dependencies
 
+Using uv (recommended):
 ```bash
+cd demo
+uv sync --extra local
+```
+
+Or using pip:
+```bash
+pip install -e ..  # Install local mem0-falkordb package first
 cd demo
 pip install -r requirements.txt
 ```

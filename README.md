@@ -65,9 +65,9 @@ See the [`demo/`](demo/) directory for a comprehensive multi-user demonstration 
 ```bash
 docker run --rm -p 6379:6379 falkordb/falkordb:latest
 cd demo
-pip install -r requirements.txt
+uv sync --extra local
 export OPENAI_API_KEY='your-key-here'
-python demo.py
+uv run python demo.py
 ```
 
 See [demo/README.md](demo/README.md) for complete instructions.

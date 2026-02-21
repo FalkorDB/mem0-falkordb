@@ -105,18 +105,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        run: pip install uv
+
       - name: Validate demo syntax
         run: |
           python -m py_compile demo/demo.py demo/inspect_graphs.py
 
-      - name: Install demo dependencies
+      - name: Install local package and demo dependencies
         run: |
           cd demo
-          pip install -r requirements.txt
+          uv sync --extra local
 
       - name: Check demo dependencies can be imported
         run: |
-          python -c "from mem0 import Memory; from mem0_falkordb import register; from rich.console import Console; from falkordb import FalkorDB; print('Demo dependencies OK')"
+          cd demo
+          uv run python -c "from mem0 import Memory; from mem0_falkordb import register; from rich.console import Console; from falkordb import FalkorDB; print('Demo dependencies OK')"
 
   build:
     runs-on: ubuntu-latest
