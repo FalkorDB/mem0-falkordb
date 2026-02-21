@@ -37,10 +37,12 @@ def extract_user_id(graph_name: str, database_prefix: str = "mem0") -> str:
     return graph_name
 
 
-def get_graph_nodes(db: FalkorDB, graph_name: str) -> List[Dict]:
-    """Get all nodes from a graph."""
+def get_graph_nodes(db: FalkorDB, graph_name: str, limit: int = 100) -> List[Dict]:
+    """Get nodes from a graph with a limit."""
     graph = db.select_graph(graph_name)
-    result = graph.query("MATCH (n) RETURN id(n) AS id, labels(n) AS labels, n AS node")
+    result = graph.query(
+        f"MATCH (n) RETURN id(n) AS id, labels(n) AS labels, n AS node LIMIT {limit}"
+    )
 
     nodes = []
     if result.result_set:
@@ -53,16 +55,19 @@ def get_graph_nodes(db: FalkorDB, graph_name: str) -> List[Dict]:
     return nodes
 
 
-def get_graph_relationships(db: FalkorDB, graph_name: str) -> List[Dict]:
-    """Get all relationships from a graph."""
+def get_graph_relationships(
+    db: FalkorDB, graph_name: str, limit: int = 100
+) -> List[Dict]:
+    """Get relationships from a graph with a limit."""
     graph = db.select_graph(graph_name)
     result = graph.query(
-        """
+        f"""
         MATCH (a)-[r]->(b)
         RETURN id(a) AS source_id, a.name AS source,
                type(r) AS relationship,
                id(b) AS target_id, b.name AS target,
                r AS rel_props
+        LIMIT {limit}
         """
     )
 

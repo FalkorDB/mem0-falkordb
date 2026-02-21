@@ -37,8 +37,7 @@ See the actual FalkorDB graph structure — nodes, relationships, and properties
 ### 1. Start FalkorDB
 
 ```bash
-cd demo
-docker compose up -d
+docker run --rm -p 6379:6379 falkordb/falkordb:latest
 ```
 
 This starts FalkorDB on `localhost:6379`.
@@ -46,6 +45,7 @@ This starts FalkorDB on `localhost:6379`.
 ### 2. Install Python Dependencies
 
 ```bash
+cd demo
 pip install -r requirements.txt
 ```
 
@@ -58,6 +58,11 @@ export OPENAI_API_KEY='your-openai-api-key-here'
 ### 4. Run the Demo
 
 ```bash
+uv run python demo.py
+```
+
+Or using standard Python:
+```bash
 python demo.py
 ```
 
@@ -67,6 +72,11 @@ The demo will run through 5 scenes automatically, showcasing different aspects o
 
 After running the demo, inspect the actual graph structure:
 
+```bash
+uv run python inspect_graphs.py
+```
+
+Or using standard Python:
 ```bash
 python inspect_graphs.py
 ```
@@ -214,10 +224,10 @@ You can customize:
 docker ps | grep falkordb
 
 # Start FalkorDB if not running
-docker compose up -d
+docker run --rm -p 6379:6379 falkordb/falkordb:latest
 
 # Check logs
-docker compose logs falkordb
+docker logs $(docker ps -q --filter ancestor=falkordb/falkordb:latest)
 ```
 
 ### OpenAI API Key Not Set
@@ -244,13 +254,13 @@ If you hit OpenAI rate limits, the demo includes small delays between requests. 
 
 ## Cleanup
 
-To stop FalkorDB and remove all data:
+To stop FalkorDB:
 
 ```bash
-docker compose down -v
+docker stop $(docker ps -q --filter ancestor=falkordb/falkordb:latest)
 ```
 
-The `-v` flag removes the data volume, deleting all graphs.
+Or simply `Ctrl+C` if running in foreground mode (without `--rm -d` flags).
 
 ---
 

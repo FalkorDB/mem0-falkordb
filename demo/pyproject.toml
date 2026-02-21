@@ -1,0 +1,20 @@
+[project]
+name = "mem0-falkordb-demo"
+version = "0.1.0"
+description = "Interactive demo for mem0-falkordb showcasing graph memory"
+requires-python = ">=3.10"
+dependencies = [
+    "mem0-falkordb>=0.4.0",
+    "mem0ai>=0.1.0",
+    "openai>=1.0.0",
+    "falkordb>=1.6.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+local = [
+    "mem0-falkordb @ {root:uri}/..",
+]
+
+[tool.uv]
+package = false

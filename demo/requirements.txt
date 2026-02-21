@@ -1,5 +1,5 @@
 mem0-falkordb>=0.4.0
-mem0ai
-openai
+mem0ai>=0.1.0
+openai>=1.0.0
 falkordb>=1.6.0
 rich>=13.0.0

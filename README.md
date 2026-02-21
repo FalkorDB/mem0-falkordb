@@ -63,8 +63,8 @@ See the [`demo/`](demo/) directory for a comprehensive multi-user demonstration 
 - **Visual inspection** — see the actual graph structure
 
 ```bash
+docker run --rm -p 6379:6379 falkordb/falkordb:latest
 cd demo
-docker compose up -d
 pip install -r requirements.txt
 export OPENAI_API_KEY='your-key-here'
 python demo.py
