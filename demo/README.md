@@ -59,8 +59,18 @@ pip install mem0ai openai falkordb rich
 
 ### 3. Set Your OpenAI API Key
 
+Option 1: Using environment variable:
 ```bash
 export OPENAI_API_KEY='your-openai-api-key-here'
+```
+
+Option 2: Using .env file (recommended):
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and add your key
+# OPENAI_API_KEY=your-openai-api-key-here
 ```
 
 ### 4. Run the Demo
@@ -247,13 +257,19 @@ docker logs $(docker ps -q --filter ancestor=falkordb/falkordb:latest)
 **Error:** `OPENAI_API_KEY environment variable not set!`
 
 **Solution:**
+
+Option 1: Export as environment variable:
 ```bash
 export OPENAI_API_KEY='your-key-here'
 ```
 
-Or create a `.env` file (not included in repo):
-```
-OPENAI_API_KEY=your-key-here
+Option 2: Create a `.env` file (recommended):
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and replace with your actual key
+# The demo will automatically load it
 ```
 
 ### Rate Limits
