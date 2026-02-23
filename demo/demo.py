@@ -21,6 +21,7 @@ import os
 import time
 from typing import Any, Dict, List
 
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import track
@@ -28,6 +29,9 @@ from rich.table import Table
 
 from mem0 import Memory
 from mem0_falkordb import register
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Register FalkorDB with Mem0
 register()
