@@ -10,3 +10,4 @@ build/
 .coverage
 coverage.xml
 wordlist.dic
+.env
