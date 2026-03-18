@@ -39,7 +39,7 @@ jobs:
         run: uv sync --extra dev --frozen
 
       - name: Run tests with coverage
-        run: pytest -v -m "not e2e" --cov=mem0_falkordb --cov-report=xml
+        run: uv run pytest -v -m "not e2e" --cov=mem0_falkordb --cov-report=xml
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
@@ -78,7 +78,7 @@ jobs:
         run: uv sync --extra dev --frozen
 
       - name: Run E2E tests
-        run: pytest -v -m e2e
+        run: uv run pytest -v -m e2e
 
   lint:
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install ruff
         run: uv tool install ruff
 
       - name: Check formatting
@@ -120,13 +120,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-
-      - name: Install uv
-        run: pip install uv
 
       - name: Install local package and demo dependencies
         run: |
@@ -156,11 +158,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install build tools
-        run: uv tool install build
-
       - name: Build package
-        run: python -m build
+        run: uv build
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
