@@ -644,7 +644,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "mem0ai"
-version = "1.0.6"
+version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openai" },
@@ -655,9 +655,9 @@ dependencies = [
     { name = "qdrant-client" },
     { name = "sqlalchemy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/01/cba73021ec1bea210f967e50a5ca2baca039d8734fbfeb1c56560d4647b4/mem0ai-1.0.6.tar.gz", hash = "sha256:c547648dcfb3262265efd1c899303920e2852ab6483a448a9e05b164a15f38b5", size = 183518, upload-time = "2026-03-17T15:48:21.594Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e2/78/9688a8c7046bbe5a9f5932eceb1dd953b40b80831cba7aa9fdec0a65370b/mem0ai-1.0.9.tar.gz", hash = "sha256:925953b88374c3dce0f07a93c0585ef7ad5acd6bcdd2e4015ecaf5a7eab476c2", size = 199752, upload-time = "2026-03-28T17:15:33.473Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/ab/db02b8d0909ead52aba46a39efab68127f4ba3ace36cf7a622e1ffa40263/mem0ai-1.0.6-py3-none-any.whl", hash = "sha256:d4cea3039a4b3ef8abc367695ea0c120943ef883312b43135114893d7ebe42ce", size = 276578, upload-time = "2026-03-17T15:48:19.787Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/31/5c66b0c01000cf3b0f61c0801ab9af7feadf7a9e4a0b5668cf5962263124/mem0ai-1.0.9-py3-none-any.whl", hash = "sha256:5153883da8f49296de763f4f92876ce3d4ee7daf7f596e3d4feb3a1709d3c4b0", size = 294561, upload-time = "2026-03-28T17:15:31.722Z" },
 ]
 
 [[package]]
