@@ -2,7 +2,7 @@
 [![PyPI version](https://badge.fury.io/py/mem0-falkordb.svg)](https://badge.fury.io/py/mem0-falkordb)
 [![Codecov](https://codecov.io/gh/falkordb/mem0-falkordb/branch/main/graph/badge.svg)](https://codecov.io/gh/falkordb/mem0-falkordb)
 [![Forum](https://img.shields.io/badge/Forum-falkordb-blue)](https://github.com/orgs/FalkorDB/discussions)
-[![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/ErBEqN9E)
+[![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.gg/6M4QwDXn2w)
 
 # mem0-falkordb
 
