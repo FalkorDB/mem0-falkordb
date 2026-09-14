@@ -5,7 +5,7 @@ description = "Interactive demo for mem0-falkordb showcasing graph memory"
 requires-python = ">=3.10"
 dependencies = [
     "mem0-falkordb",
-    "mem0ai>=0.1.0",
+    "mem0ai>=0.1.0,<2.0.0",
     "openai>=1.0.0",
     "falkordb>=1.6.0",
     "rich>=13.0.0",
